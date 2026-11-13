@@ -29,13 +29,19 @@ struct ShotPracticeView: View {
     @StateObject private var journal = ShotPracticeJournal()
     @State private var title = ""
     @State private var note = ""
-    @State private var movement = ShotMovement.pushIn
-    @State private var seconds = 6
-    @State private var lockedFocus = false
+    @State private var movement: ShotMovement
+    @State private var seconds: Int
+    @State private var lockedFocus: Bool
     @State private var history = false
     @State private var selectedSession: ShotPracticeSession?
     @State private var showingRemoval = false
     @State private var sharedExport: SharedFile?
+
+    init(initialMovement: ShotMovement = .pushIn, initialSeconds: Int = 6, initialFocusLock: Bool = false) {
+        _movement = State(initialValue: initialMovement)
+        _seconds = State(initialValue: initialSeconds)
+        _lockedFocus = State(initialValue: initialFocusLock)
+    }
 
     var body: some View {
         VStack(spacing: 0) {

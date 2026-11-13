@@ -546,3 +546,24 @@
 "The distribution package does not exist" = "No se encontró la configuración de distribución de la aplicación.";
 "Web search" = "Búsqueda web";
 "Opening page…" = "Abriendo página…";
+
+"Shot archive" = "Archivo de tomas";
+"Studio access" = "Acceso al estudio";
+
+"Plan the next shot" = "Planear la próxima toma";
+"Camera move" = "Movimiento de cámara";
+"Push in" = "Acercamiento";
+"Follow" = "Seguimiento";
+"Reveal" = "Revelación";
+"Parallax" = "Paralaje";
+"Orbit" = "Órbita";
+"Tilt" = "Inclinación";
+"Target length" = "Duración objetivo";
+"Shorter" = "Más corta";
+"Longer" = "Más larga";
+"Focus locked" = "Enfoque bloqueado";
+"Auto focus" = "Enfoque automático";
+"Shot log" = "Registro de tomas";
+"Open a camera lesson" = "Abrir una clase de cámara";
+"Review your footage" = "Revisar el material";
+"Camera lesson collections" = "Colecciones de clases de cámara";

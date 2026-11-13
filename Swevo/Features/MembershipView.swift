@@ -33,15 +33,7 @@ struct MembershipView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(spacing: 12) {
-                    CaptureArtwork(kind: .pass, height: 136)
-                        .accessibilityHidden(true)
-                    LocalizedText(commerce.premium ? "More time on the floor." : "Keep the practice going.")
-                        .font(.capture(.title2, display: true))
-                        .foregroundStyle(SwevoStyle.paper)
-                    LocalizedText("Unlimited views, downloads and media exports.")
-                        .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                }.multilineTextAlignment(.center).frame(maxWidth: .infinity)
+                membershipIntro
 
                 if exportRequired {
                     LocalizedText("Export is included with Plus.")
@@ -55,29 +47,27 @@ struct MembershipView: View {
                             LocalizedText("Access through \(expiration.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))).")
                                 .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
                         }
-                    }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background { CaptureSurface(tone: .mist) }
+                    renewalDisclosure
                 } else {
                     if api.session == nil { ConnectionPanel() }
-                    VStack(spacing: 12) {
-                        ForEach(plans, id: \.productIdentifier) { plan in
-                            planRow(plan)
-                        }
-                    }
+                    if !plans.isEmpty { planPicker }
                     if let error = commerce.plansError {
                         ErrorNote(message: error)
                         Button("Retry") { Task { await commerce.loadPlans() } }
                             .buttonStyle(CompactActionStyle()).disabled(interactionLocked)
                     }
+                    renewalDisclosure
                     VStack(spacing: 12) {
-                        ActionButton(title: purchaseButtonTitle) { subscribe() }
-                            .disabled(interactionLocked || selectedPlan == nil)
-                            .accessibilityIdentifier("membership.subscribe")
+                        purchaseAction
                         if purchasing {
-                            ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
+                            loadingMark(width: 42)
                         }
                     }
                 }
+
+                restoreLink
 
                 if attemptedPurchaseAction {
                     if let error = commerce.error { ErrorNote(message: error) }
@@ -86,26 +76,12 @@ struct MembershipView: View {
                     }
                 }
 
+                PolicyLinks(compact: true)
+
+                studioArtwork
+
                 if !exportRequired, !commerce.premium, api.session != nil { rewardOption }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    LocalizedText("Renews automatically. Cancel in your Apple account at least 24 hours before renewal.")
-                        .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 16) {
-                            restoreLink
-                            PolicyLinks(compact: true)
-                        }
-                        VStack(alignment: .leading, spacing: 0) {
-                            restoreLink
-                            PolicyLinks(compact: true)
-                        }
-                    }
-                }
-
-            }.padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 20)
-                .frame(maxWidth: 560).frame(maxWidth: .infinity)
+            }.swevoPage()
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             SheetHeading(title: "Plus") {
@@ -148,48 +124,116 @@ struct MembershipView: View {
         return "Subscribe"
     }
 
-    private func planRow(_ product: SKProduct) -> some View {
+    private var membershipIntro: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            membershipCopy(titleColor: SwevoStyle.paper, detailColor: SwevoStyle.secondary)
+            Divider().overlay(SwevoStyle.line)
+        }
+    }
+
+    private var studioArtwork: some View {
+        membershipArtwork(2.5)
+            .clipShape(.rect(cornerRadius: 4))
+            .padding(4)
+            .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func membershipCopy(titleColor: Color, detailColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            membershipTitle.foregroundStyle(titleColor)
+            LocalizedText("Unlimited views, downloads and media exports.")
+                .font(.capture(.subheadline)).foregroundStyle(detailColor)
+                .fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var membershipTitle: some View {
+        LocalizedText("Studio access")
+            .font(.capture(.title, display: true))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func membershipArtwork(_ ratio: CGFloat) -> some View {
+        Color.clear.aspectRatio(ratio, contentMode: .fit)
+            .overlay {
+                GeometryReader { frame in
+                    Image("PlusArtwork").resizable().scaledToFill()
+                        .frame(width: frame.size.width, height: frame.size.height)
+                        .clipped()
+                }
+            }.accessibilityHidden(true).allowsHitTesting(false)
+    }
+
+    private var planPicker: some View {
+        VStack(spacing: 2) { planOptions }
+            .padding(4).background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var planOptions: some View {
+        ForEach(plans, id: \.productIdentifier) { plan in
+            planOption(plan)
+        }
+    }
+
+    private func planOption(_ product: SKProduct) -> some View {
         let selected = selectedPlan?.productIdentifier == product.productIdentifier
         let price = commerce.price(product)
         let period = commerce.period(product, locale: locale)
-        let foreground = selected ? SwevoStyle.ink : SwevoStyle.paper
+        let ink = selected ? SwevoStyle.ink : SwevoStyle.paper
         let secondary = selected ? SwevoStyle.paperSecondary : SwevoStyle.secondary
         return Button { selectedID = product.productIdentifier } label: {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 20) {
-                    planName(product, selected: selected, foreground: foreground, secondary: secondary)
-                    Spacer(minLength: 0)
-                    planPrice(price, period: period, foreground: foreground, secondary: secondary)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(verbatim: product.localizedTitle).font(.capture(.headline, weight: .semibold))
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        LocalizedText("Billed every %@", period).font(.capture(.caption)).foregroundStyle(secondary)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 0)
+                        Text(verbatim: price).environment(\.layoutDirection, .leftToRight)
+                            .font(.capture(.title3, display: true)).monospacedDigit()
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(verbatim: price).environment(\.layoutDirection, .leftToRight)
+                            .font(.capture(.title3, display: true)).monospacedDigit()
+                        LocalizedText("Billed every %@", period).font(.capture(.caption)).foregroundStyle(secondary)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 12) {
-                    planName(product, selected: selected, foreground: foreground, secondary: secondary)
-                    planPrice(price, period: period, foreground: foreground, secondary: secondary)
-                }
-            }
-            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background { CaptureSurface(tone: selected ? .blush : .plum) }
-            .contentShape(.interaction, RoundedRectangle(cornerRadius: 22))
+            }.fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .foregroundStyle(ink)
+                .background(selected ? SwevoStyle.accent : SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 4))
+                .contentShape(Rectangle())
         }.buttonStyle(PressStyle()).disabled(interactionLocked)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("membership.plan.\(product.productIdentifier)")
     }
 
-    private func planName(_ product: SKProduct, selected: Bool, foreground: Color, secondary: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: product.localizedTitle).font(.capture(.headline)).foregroundStyle(foreground)
-            if selected {
-                LocalizedText("Selected").font(.capture(.caption)).foregroundStyle(secondary)
-            }
-        }.fixedSize(horizontal: false, vertical: true)
+    private var renewalDisclosure: some View {
+        LocalizedText("Renews automatically. Cancel in your Apple account at least 24 hours before renewal.")
+            .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func planPrice(_ price: String, period: String, foreground: Color, secondary: Color) -> some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            Text(verbatim: price).environment(\.layoutDirection, .leftToRight)
-                .font(.capture(.title2, weight: .bold)).foregroundStyle(foreground).fixedSize()
-            LocalizedText("Billed every %@", period).font(.capture(.caption)).foregroundStyle(secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    private var purchaseAction: some View {
+        Button(action: subscribe) {
+            HStack(spacing: 12) {
+                LocalizedText(purchaseButtonTitle).font(.capture(.headline, display: true))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Glyph(symbol: .library, size: 18, tint: SwevoStyle.accent)
+                    .frame(width: 36, height: 36)
+                    .background(SwevoStyle.ink, in: RoundedRectangle(cornerRadius: 3))
+                    .accessibilityHidden(true)
+            }.padding(.horizontal, 10).padding(.vertical, 7).frame(minHeight: 50)
+                .foregroundStyle(SwevoStyle.ink)
+                .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 5))
+                .contentShape(Rectangle())
+        }.buttonStyle(PressStyle())
+            .disabled(interactionLocked || selectedPlan == nil)
+            .accessibilityIdentifier("membership.subscribe")
     }
 
     private func subscribe() {
@@ -217,7 +261,7 @@ struct MembershipView: View {
             }
             if ads.busy {
                 HStack(spacing: 12) {
-                    ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
+                    loadingMark(width: 28)
                     LocalizedText("Loading ad…").font(.capture(.footnote))
                     Spacer(minLength: 12)
                     Button("Cancel") { cancelRewardRequest() }
@@ -244,20 +288,35 @@ struct MembershipView: View {
         ads.cancelRewardLoading()
     }
 
+    private func loadingMark(width: CGFloat) -> some View {
+        Image("SwevoLoadingMark").renderingMode(.template).resizable().scaledToFit()
+            .foregroundStyle(SwevoStyle.accent)
+            .frame(width: width, height: 14)
+            .phaseAnimator([false, true]) { content, dimmed in
+                content.opacity(reduceMotion || scenePhase != .active ? 1 : (dimmed ? 0.35 : 1))
+            } animation: { _ in
+                reduceMotion || scenePhase != .active ? nil : .easeInOut(duration: 0.6)
+            }
+            .accessibilityHidden(true)
+    }
+
     private var restoreLink: some View {
         Button {
             attemptedPurchaseAction = true
             commerce.restore()
         } label: {
             LocalizedText("Restore purchases")
-                .font(.capture(.footnote, weight: .medium))
+                .font(.capture(.footnote, display: true))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .foregroundStyle(SwevoStyle.accent)
-                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .frame(minHeight: 44)
+                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 4))
+                .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
                 .contentShape(Rectangle())
         }.disabled(interactionLocked).buttonStyle(PressStyle())
+            .accessibilityIdentifier("membership.restore")
     }
-
 }
 
 struct AccountView: View {

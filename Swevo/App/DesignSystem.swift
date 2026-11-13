@@ -2,17 +2,17 @@ import SwiftUI
 import UIKit
 
 enum SwevoStyle {
-    static let background = Color(red: 0.071, green: 0.106, blue: 0.082)
-    static let surface = Color(red: 0.106, green: 0.165, blue: 0.129)
-    static let raised = Color(red: 0.161, green: 0.235, blue: 0.173)
-    static let accent = Color(red: 0.831, green: 0.918, blue: 0.439)
-    static let ink = Color(red: 0.098, green: 0.145, blue: 0.082)
-    static let secondary = Color(red: 0.737, green: 0.784, blue: 0.686)
-    static let paper = Color(red: 0.945, green: 0.941, blue: 0.867)
-    static let paperSecondary = Color(red: 0.275, green: 0.341, blue: 0.227)
-    static let mist = Color(red: 0.851, green: 0.890, blue: 0.710)
-    static let line = Color.white.opacity(0.10)
-    static let danger = Color(red: 1.000, green: 0.659, blue: 0.565)
+    static let background = Color(red: 0.090, green: 0.078, blue: 0.098)
+    static let surface = Color(red: 0.144, green: 0.117, blue: 0.153)
+    static let raised = Color(red: 0.211, green: 0.168, blue: 0.220)
+    static let accent = Color(red: 1, green: 0.769, blue: 0.624)
+    static let ink = Color(red: 0.133, green: 0.086, blue: 0.122)
+    static let secondary = Color(red: 0.800, green: 0.749, blue: 0.776)
+    static let paper = Color(red: 0.988, green: 0.949, blue: 0.917)
+    static let paperSecondary = Color(red: 0.365, green: 0.247, blue: 0.314)
+    static let mist = Color(red: 0.929, green: 0.831, blue: 0.828)
+    static let line = paper.opacity(0.14)
+    static let danger = Color(red: 1, green: 0.650, blue: 0.670)
 }
 
 // MARK: - Original raster artwork (Asset Catalog). Missing art never blocks layout or touch.
@@ -67,26 +67,61 @@ struct GuideArtwork: View {
     }
 }
 
-struct CaptureBanner: View {
+struct SceneArtwork: View {
+    let name: String
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Color.clear.aspectRatio(1.9, contentMode: .fit)
-                .overlay {
-                    GeometryReader { geometry in
-                        Image("HeroCapture").resizable().scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                    }
+        GeometryReader { geometry in
+            Image(name).resizable().interpolation(.high).scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+        }
+        .background(SwevoStyle.background)
+        .overlay {
+            LinearGradient(stops: [
+                .init(color: SwevoStyle.background.opacity(0.70), location: 0),
+                .init(color: .clear, location: 0.24),
+                .init(color: .clear, location: 0.46),
+                .init(color: SwevoStyle.background.opacity(0.75), location: 0.76),
+                .init(color: SwevoStyle.background, location: 1)
+            ], startPoint: .top, endPoint: .bottom)
+        }
+        .ignoresSafeArea(.container, edges: .horizontal)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+struct ScenePage<Opening: View, PageContent: View>: View {
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    let artwork: String
+    let depth: CGFloat
+    @ViewBuilder let opening: (CGFloat) -> Opening
+    @ViewBuilder let content: (GeometryProxy) -> PageContent
+
+    var body: some View {
+        GeometryReader { container in
+            let widthAdjustment = min(72, max(-32, (container.size.width - 390) * 0.22))
+            let height = verticalSizeClass == .compact ? min(depth, 178) : depth + widthAdjustment
+            ScrollView {
+                VStack(spacing: 0) {
+                    opening(height)
+                        .frame(maxWidth: .infinity, minHeight: height, alignment: .bottomLeading)
+                        .pageHorizontalMargins()
+                        .frame(maxWidth: 680)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, container.safeAreaInsets.top + 10)
+                        .padding(.bottom, 16)
+                        .background { SceneArtwork(name: artwork) }
+                    content(container).swevoPage()
                 }
-                .clipShape(.rect(cornerRadius: 12))
-                .accessibilityHidden(true)
-            LocalizedText("Make the move count.")
-                .font(.capture(.largeTitle, display: true)).foregroundStyle(SwevoStyle.paper)
-                .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
-            LocalizedText("Learn to reveal, follow and reframe with the phone in your hand.")
-                .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // Only the scroll surface enters the status area. The opening's controls
+            // start below the owning container's safe inset and scroll with the artwork.
+            .ignoresSafeArea(.container, edges: .top)
+        }
+        .swevoScreenBackground()
+        .foregroundStyle(SwevoStyle.paper)
     }
 }
 
@@ -165,11 +200,12 @@ struct IconButton: View {
 
 struct PressStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(!isEnabled ? 0.55 : (configuration.isPressed ? 0.7 : 1))
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 // Compact controls keep their full localized label; enclosing layouts scroll or use ViewThatFits.
@@ -281,11 +317,44 @@ extension View {
             .frame(maxWidth: 680).frame(maxWidth: .infinity, alignment: .top)
     }
     @ViewBuilder
-    fileprivate func pageHorizontalMargins() -> some View {
+    func pageHorizontalMargins() -> some View {
         if #available(iOS 27.1, *) {
             contentMargins(for: .container, edges: .horizontal)
         } else {
             padding(.horizontal, 20)
+        }
+    }
+
+    func swevoGlass(cornerRadius: CGFloat = 16) -> some View {
+        modifier(SwevoGlass(cornerRadius: cornerRadius))
+    }
+
+    func sceneClose(disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        overlay(alignment: .topTrailing) {
+            IconButton(symbol: .close, label: "Close", action: action)
+                .swevoGlass(cornerRadius: 22)
+                .disabled(disabled)
+                .pageHorizontalMargins()
+                .padding(.top, 8)
+        }
+    }
+}
+
+private struct SwevoGlass: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if reduceTransparency {
+            content.background(SwevoStyle.raised, in: shape)
+                .overlay { shape.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
+        } else if #available(iOS 26, *) {
+            content.glassEffect(.regular.tint(SwevoStyle.surface.opacity(0.42)), in: shape)
+        } else {
+            content.background(.ultraThinMaterial, in: shape)
+                .background(SwevoStyle.surface.opacity(0.65), in: shape)
+                .overlay { shape.strokeBorder(SwevoStyle.paper.opacity(0.22)).allowsHitTesting(false) }
         }
     }
 }
@@ -379,7 +448,7 @@ struct CaptureSurface: View {
     enum Tone { case accent, plum, blush, mist }
     let tone: Tone
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         switch tone {
         case .accent: shape.fill(SwevoStyle.accent)
         case .plum: shape.fill(SwevoStyle.raised).overlay(shape.strokeBorder(SwevoStyle.line))
@@ -434,8 +503,8 @@ struct ChoiceStrip: View {
                             .padding(.horizontal, 16).padding(.vertical, 10)
                             .frame(minHeight: 44)
                             .foregroundStyle(selected == value ? SwevoStyle.ink : SwevoStyle.paper)
-                            .background { CaptureSurface(tone: selected == value ? .accent : .plum) }
-                            .contentShape(Rectangle())
+                            .background(selected == value ? SwevoStyle.accent : SwevoStyle.surface, in: Capsule())
+                            .contentShape(.interaction, Capsule())
                     }.buttonStyle(PressStyle())
                         .accessibilityAddTraits(selected == value ? .isSelected : [])
                 }

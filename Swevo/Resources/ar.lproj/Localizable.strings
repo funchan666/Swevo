@@ -546,3 +546,24 @@
 "The distribution package does not exist" = "لم يتم العثور على إعدادات توزيع التطبيق.";
 "Web search" = "بحث الويب";
 "Opening page…" = "جارٍ فتح الصفحة…";
+
+"Shot archive" = "أرشيف اللقطات";
+"Studio access" = "عضوية الاستوديو";
+
+"Plan the next shot" = "تخطيط اللقطة التالية";
+"Camera move" = "حركة الكاميرا";
+"Push in" = "اقتراب";
+"Follow" = "تتبّع";
+"Reveal" = "كشف المشهد";
+"Parallax" = "اختلاف المنظر";
+"Orbit" = "دوران حول الهدف";
+"Tilt" = "إمالة";
+"Target length" = "المدة المستهدفة";
+"Shorter" = "أقصر";
+"Longer" = "أطول";
+"Focus locked" = "التركيز مقفل";
+"Auto focus" = "تركيز تلقائي";
+"Shot log" = "سجل اللقطات";
+"Open a camera lesson" = "فتح درس تصوير";
+"Review your footage" = "مراجعة التصوير";
+"Camera lesson collections" = "مجموعات دروس التصوير";

@@ -546,3 +546,24 @@
 "The distribution package does not exist" = "앱 배포 설정을 찾을 수 없습니다.";
 "Web search" = "웹 검색";
 "Opening page…" = "페이지 여는 중…";
+
+"Shot archive" = "촬영 아카이브";
+"Studio access" = "스튜디오 이용권";
+
+"Plan the next shot" = "다음 숏 계획하기";
+"Camera move" = "카메라 움직임";
+"Push in" = "다가가기";
+"Follow" = "따라가기";
+"Reveal" = "리빌";
+"Parallax" = "패럴랙스";
+"Orbit" = "돌아가기";
+"Tilt" = "틸트";
+"Target length" = "목표 길이";
+"Shorter" = "짧게";
+"Longer" = "길게";
+"Focus locked" = "초점 고정";
+"Auto focus" = "자동 초점";
+"Shot log" = "촬영 기록";
+"Open a camera lesson" = "촬영 레슨 열기";
+"Review your footage" = "촬영 영상 다시 보기";
+"Camera lesson collections" = "촬영 레슨 모음";

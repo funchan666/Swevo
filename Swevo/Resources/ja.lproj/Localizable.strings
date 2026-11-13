@@ -546,3 +546,24 @@
 "The distribution package does not exist" = "アプリの配信設定が見つかりません。";
 "Web search" = "ウェブ検索";
 "Opening page…" = "ページを開いています…";
+
+"Shot archive" = "ショットアーカイブ";
+"Studio access" = "スタジオアクセス";
+
+"Plan the next shot" = "次のカットを計画";
+"Camera move" = "カメラの動き";
+"Push in" = "寄り";
+"Follow" = "追従";
+"Reveal" = "リビール";
+"Parallax" = "パララックス";
+"Orbit" = "回り込み";
+"Tilt" = "ティルト";
+"Target length" = "目標の長さ";
+"Shorter" = "短く";
+"Longer" = "長く";
+"Focus locked" = "フォーカス固定";
+"Auto focus" = "オートフォーカス";
+"Shot log" = "撮影記録";
+"Open a camera lesson" = "撮影レッスンを開く";
+"Review your footage" = "撮影素材を見返す";
+"Camera lesson collections" = "撮影レッスン集";

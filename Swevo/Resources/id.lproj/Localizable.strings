@@ -546,3 +546,24 @@
 "The distribution package does not exist" = "Konfigurasi distribusi aplikasi tidak ditemukan.";
 "Web search" = "Penelusuran web";
 "Opening page…" = "Membuka halaman…";
+
+"Shot archive" = "Arsip bidikan";
+"Studio access" = "Akses studio";
+
+"Plan the next shot" = "Rencanakan pengambilan berikutnya";
+"Camera move" = "Gerakan kamera";
+"Push in" = "Mendekat";
+"Follow" = "Mengikuti";
+"Reveal" = "Pengungkapan";
+"Parallax" = "Paralaks";
+"Orbit" = "Mengorbit";
+"Tilt" = "Kemiringan";
+"Target length" = "Durasi target";
+"Shorter" = "Lebih pendek";
+"Longer" = "Lebih panjang";
+"Focus locked" = "Fokus terkunci";
+"Auto focus" = "Fokus otomatis";
+"Shot log" = "Catatan pengambilan";
+"Open a camera lesson" = "Buka pelajaran kamera";
+"Review your footage" = "Tinjau rekaman";
+"Camera lesson collections" = "Koleksi pelajaran kamera";

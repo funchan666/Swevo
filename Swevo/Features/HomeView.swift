@@ -20,59 +20,34 @@ struct HomeView: View {
     @State private var showingLinkGuide = false
     @State private var showingGuide = false
     @State private var showingJournal = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @SceneStorage("shot.movement") private var movement = ShotMovement.pushIn
+    @SceneStorage("shot.duration") private var seconds = 6
+    @SceneStorage("shot.focusLock") private var lockedFocus = false
     @FocusState private var focused: Bool
     var body: some View {
         let request = ChannelRequest(links: commerce.release?.lcList?["us"] ?? [], attempt: channelRetry)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                HStack(spacing: 10) {
-                    Text(verbatim: "Swevo").font(.capture(.title3, display: true))
-                        .foregroundStyle(SwevoStyle.paper).accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button(LocalizedStringKey(commerce.premium ? "PLUS" : "Get Plus")) { paywall = true }
-                        .buttonStyle(MatteActionStyle())
-                    IconButton(symbol: .settings, label: "Open Me and account settings", action: openAccount)
-                }
-                linkComposer
-                if let error {
-                    MessagePanel(title: "Couldn’t load lesson collections", message: error, actionTitle: "Try again") {
-                        channelRetry += 1
+        GeometryReader { container in
+            let layout = shotWorkspaceLayout(in: container)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    layout {
+                        VStack(alignment: .leading, spacing: 14) {
+                            shotPlanner
+                            cameraAction(.edit, title: "Review your footage", action: openTools)
+                        }.frame(maxWidth: .infinity, alignment: .topLeading)
+                        VStack(alignment: .leading, spacing: 16) {
+                            linkComposer
+                            connection
+                            cameraAction(.feed, title: "Watch tutorials", action: discover)
+                            referenceFootage
+                            ShotGuideEntry(compact: true) { showingGuide = true }
+                            recentLinks
+                        }.frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                }
-                if api.session == nil { ConnectionPanel() }
-                CaptureBanner()
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionLabel(title: "Plan the next shot")
-                    cameraAction(.feed, title: "Watch tutorials", action: discover)
-                    cameraAction(.edit, title: "Review your footage", action: openTools)
-                    ShotPracticeEntry { showingJournal = true }
-                    ShotGuideEntry(compact: true) { showingGuide = true }
-                }
-                recentLinks
-                if !channels.isEmpty {
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            LocalizedText("Camera lesson collections").font(.capture(.headline))
-                            LocalizedText("Pick a camera move and see it from start to finish.").font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                        CaptureArtwork(kind: .notebook, height: 76).frame(width: 114)
-                    }
-                    ForEach(Array(channels.enumerated()), id: \.offset) { _, item in
-                        if let info = item.extraInfo, let title = info.channelName, let short = info.externalLinks {
-                            Button { channel = ChannelRoute(link: short, title: title) } label: {
-                                HStack(spacing: 14) {
-                                    MediaCover(url: WebAddress.media(item.shortCover), folder: false).frame(width: 62, height: 72).clipShape(RoundedRectangle(cornerRadius: 12))
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(verbatim: title).font(.capture(.headline)).lineLimit(2)
-                                        if let count = info.videoFileCount { LocalizedText("\(count) videos").font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary) }
-                                    }
-                                    Spacer()
-                                }
-                            }.buttonStyle(PressStyle())
-                        }
-                    }
-                }
-            }.swevoPage()
+                }.swevoPage()
+            }
         }.swevoScreenBackground().scrollDismissesKeyboard(.interactively)
             .dismissKeyboardOnOutsideTap($focused, scope: "home-link-input")
             .sheet(item: $channel) { ChannelView(route: $0) }
@@ -88,7 +63,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $paywall) { MembershipView() }
             .sheet(isPresented: $showingLinkGuide) { LinkGuideSheet() }
-            .sheet(isPresented: $showingJournal) { ShotPracticeView() }
+            .sheet(isPresented: $showingJournal) {
+                ShotPracticeView(initialMovement: movement, initialSeconds: seconds, initialFocusLock: lockedFocus)
+            }
             .sheet(isPresented: $showingGuide) { ShotGuideView() }
             .task(id: request) {
                 guard !Task.isCancelled else { return }
@@ -103,6 +80,174 @@ struct HomeView: View {
                 }
             }
     }
+
+    private var header: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { headerContent }
+            VStack(alignment: .leading, spacing: 6) { headerContent }
+        }
+    }
+
+    @ViewBuilder private var headerContent: some View {
+            Text(verbatim: "Swevo").font(.capture(.title2, display: true))
+                .foregroundStyle(SwevoStyle.paper).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0).frame(maxHeight: 0)
+            Button {
+                paywall = true
+            } label: {
+                LocalizedText(commerce.premium ? "Plus" : "Get Plus")
+                    .font(.capture(.footnote, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .foregroundStyle(SwevoStyle.paper)
+                    .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 9))
+                    .contentShape(Rectangle())
+            }.buttonStyle(PressStyle())
+            IconButton(symbol: .settings, label: "Open Me and account settings", action: openAccount)
+    }
+
+    @ViewBuilder private var connection: some View {
+        if api.session == nil { ConnectionPanel() }
+        if let error {
+            MessagePanel(title: "Couldn’t load lesson collections", message: error, actionTitle: "Try again") {
+                channelRetry += 1
+            }
+        }
+    }
+
+    private var shotPlanner: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            LocalizedText("Plan the next shot").font(.capture(.largeTitle, display: true))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            shotFrame
+            VStack(alignment: .leading, spacing: 6) {
+                LocalizedText("Camera move").font(.capture(.subheadline, weight: .semibold))
+                    .foregroundStyle(SwevoStyle.secondary)
+                ChoiceStrip(values: ShotMovement.allCases.map(\.label), selected: movement.label) { label in
+                    if let move = ShotMovement.allCases.first(where: { $0.label == label }) { movement = move }
+                }
+            }
+            Divider().overlay(SwevoStyle.line)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { durationControls; focusControl.fixedSize(horizontal: true, vertical: false) }
+                VStack(alignment: .leading, spacing: 8) { durationControls; focusControl }
+            }
+            Button { showingJournal = true } label: {
+                HStack(spacing: 10) {
+                    LocalizedText("Shot log").font(.capture(.headline, display: true))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    Glyph(symbol: .edit, size: 19, tint: SwevoStyle.ink)
+                }.padding(12).frame(minHeight: 49)
+                    .foregroundStyle(SwevoStyle.ink)
+                    .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 5))
+                    .contentShape(Rectangle())
+            }.buttonStyle(PressStyle()).accessibilityIdentifier("practice.openJournal")
+        }
+    }
+
+    private var shotFrame: some View {
+        let art: GuideArtwork.Subject = switch movement {
+        case .pushIn: .steady
+        case .track: .track
+        case .reveal: .reveal
+        case .parallax: .parallax
+        case .orbit, .tilt: .setup
+        }
+        return SwevoStyle.raised.aspectRatio(2.5, contentMode: .fit)
+            .overlay { GuideArtwork(subject: art) }
+            .clipShape(.rect(cornerRadius: 5))
+            .accessibilityHidden(true)
+    }
+
+    private var durationControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LocalizedText("Target length").font(.capture(.caption))
+                .foregroundStyle(SwevoStyle.secondary)
+            Text("\(seconds) s").font(.capture(.headline, display: true)).monospacedDigit()
+                .accessibilityLabel(Text("Target length"))
+                .accessibilityValue(Text("\(seconds) s"))
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) { lengthButtons }
+                VStack(alignment: .leading, spacing: 6) { lengthButtons }
+            }
+        }
+    }
+
+    @ViewBuilder private var lengthButtons: some View {
+        Button { seconds -= 1 } label: { lengthLabel("Shorter") }
+            .buttonStyle(PressStyle()).disabled(seconds <= ShotPracticeJournal.amountRange.lowerBound)
+        Button { seconds += 1 } label: { lengthLabel("Longer") }
+            .buttonStyle(PressStyle()).disabled(seconds >= ShotPracticeJournal.amountRange.upperBound)
+    }
+
+    private func lengthLabel(_ title: String) -> some View {
+        LocalizedText(title).font(.capture(.footnote, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8).padding(.vertical, 6)
+            .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(SwevoStyle.paper)
+            .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 5))
+            .contentShape(Rectangle())
+    }
+
+    private var focusControl: some View {
+        Button { lockedFocus.toggle() } label: {
+            LocalizedText(lockedFocus ? "Focus locked" : "Auto focus")
+                .font(.capture(.caption, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10).padding(.vertical, 6).frame(minHeight: 44)
+                .foregroundStyle(lockedFocus ? SwevoStyle.ink : SwevoStyle.paper)
+                .background(lockedFocus ? SwevoStyle.accent : SwevoStyle.raised,
+                            in: RoundedRectangle(cornerRadius: 5))
+                .contentShape(Rectangle())
+        }.buttonStyle(PressStyle()).accessibilityAddTraits(lockedFocus ? .isSelected : [])
+    }
+
+    @ViewBuilder private var referenceFootage: some View {
+        if !channels.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                LocalizedText("Camera lesson collections").font(.capture(.title3, display: true))
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(channels.indices, id: \.self) { index in
+                    let item = channels[index]
+                    if let info = item.extraInfo, let title = info.channelName, let short = info.externalLinks {
+                        Button { channel = ChannelRoute(link: short, title: title) } label: {
+                            VStack(alignment: .leading, spacing: 7) {
+                                MediaCover(url: WebAddress.media(item.shortCover)).aspectRatio(3.0, contentMode: .fit)
+                                    .clipShape(.rect(cornerRadius: 4)).accessibilityHidden(true)
+                                Text(verbatim: title).font(.capture(.subheadline, weight: .semibold))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let count = info.videoFileCount {
+                                    LocalizedText("\(count) videos").font(.capture(.caption))
+                                        .foregroundStyle(SwevoStyle.secondary)
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                        }.buttonStyle(PressStyle())
+                    }
+                }
+            }
+        }
+    }
+
+    private func shotWorkspaceLayout(in container: GeometryProxy) -> AnyLayout {
+        var width = container.size.width - 40
+        var occupied = false
+        if #available(iOS 27.1, *) {
+            let margins = container.contentMargins(for: .container, edges: .horizontal)
+            width = container.size.width - margins.leading - margins.trailing
+            let regions = container.reservedRegions(kind: .division) + container.reservedRegions(kind: .occlusion)
+            let bounds = CGRect(origin: .zero, size: container.size)
+            occupied = regions.contains { $0.isActive && bounds.intersects($0.frame) }
+        }
+        if width >= 560, !typeSize.isAccessibilitySize, !occupied {
+            return AnyLayout(HStackLayout(alignment: .top, spacing: 24))
+        }
+        return AnyLayout(VStackLayout(alignment: .leading, spacing: 20))
+    }
+
     private var linkComposer: some View {
         VStack(alignment: .leading, spacing: 12) {
             LocalizedText("Open a camera lesson").font(.capture(.headline, display: true))

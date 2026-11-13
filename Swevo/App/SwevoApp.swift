@@ -101,10 +101,10 @@ struct SwevoStartupView: View {
 }
 
 enum SwevoTab: Int, CaseIterable, Hashable {
-    case home, discover, tools, library, me
-    var name: String { ["Home", "Discover", "Practice", "Library", "Me"][rawValue] }
-    // Original single-colour tab artwork; the system tab bar tints it.
-    var artwork: String { ["TabHome", "TabDiscover", "TabTools", "TabLibrary", "TabMe"][rawValue] }
+    case home, tools, library, me
+    var name: String { ["Shot log", "Edit", "Library", "Me"][rawValue] }
+    var artwork: String { ["TabShotLog", "TabCut", "TabArchive", "TabProfile"][rawValue] }
+    var identifier: String { "tab.\(name.lowercased())" }
 }
 
 // System tab item: title and original image, so the bar can follow iPhone Duo's
@@ -122,13 +122,60 @@ private struct SwevoTabItem: View {
 }
 
 private extension View {
-    func swevoTab(_ tab: SwevoTab) -> some View {
+    func swevoTab(_ tab: SwevoTab, nativeBar: Bool) -> some View {
         tabItem { SwevoTabItem(tab: tab) }
             .tag(tab)
-            .toolbarBackground(SwevoStyle.background, for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
+            .toolbar(nativeBar ? .visible : .hidden, for: .tabBar)
             .toolbarColorScheme(.dark, for: .tabBar)
-            .accessibilityIdentifier("tab.\(tab.name.lowercased())")
+    }
+}
+
+private struct SwevoTabDock: View {
+    static let maximumWidth: CGFloat = 488
+    @Binding var selection: SwevoTab
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var highlight
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(SwevoTab.allCases, id: \.self) { tab in
+                let selected = selection == tab
+                Button { selection = tab } label: {
+                    VStack(spacing: 3) {
+                        TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.accent : SwevoStyle.paper)
+                            .frame(width: 26, height: 26)
+                        LocalizedText(tab.name)
+                            .font(.capture(.caption2, weight: selected ? .semibold : .medium))
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 5)
+                    .frame(minWidth: 44, maxWidth: .infinity, minHeight: 52)
+                    .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
+                    .background {
+                        if selected {
+                            RoundedRectangle(cornerRadius: 17)
+                                .fill(SwevoStyle.accent.opacity(0.16))
+                                .strokeBorder(SwevoStyle.accent.opacity(0.35))
+                                .matchedGeometryEffect(id: "selected-tab", in: highlight)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel(LocalizedStringKey(tab.name))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier(tab.identifier)
+            }
+        }
+        .padding(5)
+        .swevoGlass(cornerRadius: 23)
+        .frame(maxWidth: Self.maximumWidth)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selection)
     }
 }
 
@@ -139,28 +186,39 @@ struct SwevoRootView: View {
     @EnvironmentObject private var quota: QuotaStore
     @EnvironmentObject private var offline: OfflineStore
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tab: SwevoTab = .home
+    @Environment(\.self) private var environment
+    @SceneStorage("root.tab") private var tab: SwevoTab = .home
     @State private var editing: PracticeRecording?
-    @State private var linkDraft = ""
+    @SceneStorage("home.linkDraft") private var linkDraft = ""
     @State private var libraryFilter = "Saved"
+    @State private var showingLessons = false
+    @FocusState private var linkFocused: Bool
     var body: some View {
-        TabView(selection: $tab) {
-            HomeView(openAccount: { tab = .me }, discover: { tab = .discover }, openTools: { tab = .tools }, link: $linkDraft)
-                .swevoTab(.home)
-            // Mount the feed only while selected: it owns players and quota admission.
-            Group {
-                if tab == .discover { DiscoverView(onExit: { tab = .home }) }
-                else { SwevoStyle.background.ignoresSafeArea() }
-            }.swevoTab(.discover)
-            ToolsView().swevoTab(.tools)
-            LibraryView(edit: { editing = $0 }, filter: $libraryFilter).swevoTab(.library)
-            AccountView().swevoTab(.me)
+        GeometryReader { container in
+            let nativeBar = usesNativeTabBar(in: container)
+            TabView(selection: $tab) {
+                HomeView(openAccount: { tab = .me }, discover: { showingLessons = true },
+                         openTools: { tab = .tools }, link: $linkDraft, linkFocus: $linkFocused)
+                    .swevoTab(.home, nativeBar: nativeBar)
+                ToolsView().swevoTab(.tools, nativeBar: nativeBar)
+                LibraryView(edit: { editing = $0 }, filter: $libraryFilter).swevoTab(.library, nativeBar: nativeBar)
+                AccountView().swevoTab(.me, nativeBar: nativeBar)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !nativeBar, !linkFocused {
+                    SwevoTabDock(selection: $tab)
+                }
+            }
         }
         .tint(SwevoStyle.accent)
-        .foregroundStyle(.white)
+        .foregroundStyle(SwevoStyle.paper)
+        .onChange(of: tab) { _, selection in
+            if selection != .home { linkFocused = false }
+        }
             .sheet(item: $editing) { EditorSheet(initialMovie: $0) }
+            .fullScreenCover(isPresented: $showingLessons) { DiscoverView(canDismiss: true) }
             .overlay(alignment: .top) {
-                if tab != .discover { DownloadCompletionNotice().padding(.top, 8) }
+                if !showingLessons { DownloadCompletionNotice().padding(.top, 8) }
             }
             .task(id: library.downloadsRequest) {
                 guard library.downloadsRequest != nil else { return }
@@ -187,6 +245,19 @@ struct SwevoRootView: View {
                 }
             }
             .modifier(AccountBusyModifier())
+    }
+
+    private func usesNativeTabBar(in container: GeometryProxy) -> Bool {
+        if environment.dynamicTypeSize.isAccessibilitySize || container.size.width < 224 { return true }
+        guard #available(iOS 27.1, *) else { return false }
+        if environment.toolbarVerticalEdge != nil { return true }
+
+        let width = min(SwevoTabDock.maximumWidth, container.size.width - 24)
+        let height = min(84, container.size.height)
+        let dock = CGRect(x: (container.size.width - width) / 2, y: container.size.height - height,
+                          width: width, height: height)
+        let regions = container.reservedRegions(kind: .division) + container.reservedRegions(kind: .occlusion)
+        return regions.contains { $0.isActive && dock.intersects($0.frame) }
     }
 }
 

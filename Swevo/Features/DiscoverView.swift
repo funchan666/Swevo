@@ -126,13 +126,16 @@ struct DiscoverView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if api.session == nil {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        CaptureArtwork(kind: .lesson, height: 208)
-                        LocalizedText("Connecting your lesson feed…")
-                            .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                        ConnectionPanel()
-                    }.swevoPage()
+                VStack(spacing: 0) {
+                    feedHeader
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            CaptureArtwork(kind: .lesson, height: 208)
+                            LocalizedText("Connecting your lesson feed…")
+                                .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                            ConnectionPanel()
+                        }.swevoPage()
+                    }
                 }
             } else if feed.clips.isEmpty {
                 VStack(spacing: 0) {
