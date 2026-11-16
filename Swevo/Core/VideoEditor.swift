@@ -107,11 +107,20 @@ final class VideoEditor: ObservableObject {
     }
 
     func restoreSourcePreview(seekTo time: Double) {
-        if previewURL != nil {
-            clearRenderedPreview()
-            if let sourceURL { preview.load(sourceURL, autoplay: false) }
-        }
+        showSourcePreview()
+        preview.stopRepeating()
         preview.seek(time)
+    }
+
+    func playRange(_ range: ClosedRange<Double>) {
+        showSourcePreview()
+        preview.playRepeating(range)
+    }
+
+    private func showSourcePreview() {
+        guard let sourceURL, previewURL != nil || preview.error != nil else { return }
+        clearRenderedPreview()
+        preview.load(sourceURL, autoplay: false)
     }
 
     func applyPreview() async {

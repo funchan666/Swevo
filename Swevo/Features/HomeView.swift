@@ -1,73 +1,226 @@
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
+    @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var offline: OfflineStore
     @Environment(\.dynamicTypeSize) private var typeSize
     @Binding var importing: Bool
     let edit: (PracticeRecording) -> Void
+    let review: (PracticeRecording) -> Void
     let openLibrary: () -> Void
     let openLearning: () -> Void
-    @State private var offlinePlayer: PlayerRoute?
+    @SceneStorage("home.linkDraft") private var link = ""
+    @FocusState private var linkFocused: Bool
+    @State private var linkError: String?
+    @State private var searchRequest: LessonSearch?
+    @State private var editLinkAfterSearch = false
+    @State private var player: PlayerRoute?
 
-    private var recentlyOpened: [RecentVideo] {
+    private var videoHistory: [RecentVideo] {
         let local = library.movies.filter { $0.lastOpenedAt != nil && !$0.isAudio }.map(RecentVideo.local)
         let downloads = offline.videos.filter { $0.lastOpenedAt != nil }.map(RecentVideo.offline)
-        return Array((local + downloads).sorted { $0.date > $1.date }.prefix(3))
+        let online = library.watchedVideos(for: api.offlineOwnerID).map(RecentVideo.online)
+        let ordered = (local + downloads + online).sorted { $0.date > $1.date }
+        var seen = Set<String>()
+        return ordered.filter { seen.insert($0.id).inserted }
     }
 
     var body: some View {
-        ScenePage(artwork: nil, depth: 48, openingGap: 0) { _ in
-            SceneTitle("Videos", size: 38)
-        } content: { container in
-            let recent = recentlyOpened
+        let history = videoHistory
+        let latest = history.first
+        return ScenePage(artwork: latest == nil ? "EmptyImports" : nil,
+                         depth: latest == nil ? 172 : 0, artworkOpacity: 0.96) { container in
             let bounds = CGRect(origin: .zero, size: container.size)
-            let wide = !typeSize.isAccessibilitySize
+            let wide = latest != nil && !typeSize.isAccessibilitySize
                 && SwevoStyle.pageContentWidth(in: container) >= 600
                 && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
             let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
-                              : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+                              : AnyLayout(VStackLayout(alignment: .leading, spacing: 22))
 
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 12) {
-                    VideoImportActions(onImported: edit, importing: $importing, sideBySide: wide)
-                    LocalizedText("Swevo makes a copy for editing.")
-                        .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let latest = recent.first {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionLabel(title: "Recently opened").accessibilityAddTraits(.isHeader)
-                        layout {
-                            recentButton(latest, featured: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            if recent.count > 1 {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    ForEach(recent.dropFirst()) { movie in
-                                        recentButton(movie)
-                                    }
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
-                VStack(spacing: 0) {
-                    if !library.movies.isEmpty {
-                        LearningLink(symbol: .folder, title: "View files", action: openLibrary)
+            VStack(alignment: .leading, spacing: 22) {
+                layout {
+                    VStack(alignment: .leading, spacing: 12) {
+                        VideoImportActions(onImported: edit, importing: $importing, presentation: .prominent)
+                        linkComposer
                     }
-                    LearningLink(symbol: .link, title: "Lesson link or code", detail: "Tutorials & practice", action: openLearning)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                    if let latest {
+                        VStack(alignment: .leading, spacing: 8) {
+                            SectionLabel(title: "Last opened").accessibilityAddTraits(.isHeader)
+                            recentButton(latest, featured: true)
+                            if case .local(let movie) = latest, movie.rangeMarks?.isEmpty == false {
+                                shortcut("Review saved ranges", glyph: .bookmark) { review(movie) }
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
                 }
+                shortcuts
+                historySection(history.dropFirst(), hasVideos: latest != nil)
             }
-        }.fullScreenCover(item: $offlinePlayer) { PlayerScreen(route: $0) }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .dismissKeyboardOnOutsideTap($linkFocused, scope: "home-video-link")
+        .fullScreenCover(item: $player) { PlayerScreen(route: $0) }
+        .fullScreenCover(item: $searchRequest, onDismiss: {
+            if editLinkAfterSearch {
+                editLinkAfterSearch = false
+                linkFocused = true
+            }
+        }) { request in
+            DiscoverView(initialSearch: request.query, canDismiss: true, returnToLinkInput: {
+                editLinkAfterSearch = true
+                searchRequest = nil
+            })
+        }
     }
 
-    @ViewBuilder private func recentButton(_ video: RecentVideo, featured: Bool = false) -> some View {
+    private var linkComposer: some View {
+        let hasLink = !link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let stacks = typeSize.isAccessibilitySize
+        let layout = stacks ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                            : AnyLayout(HStackLayout(spacing: 0))
+        return VStack(alignment: .leading, spacing: 8) {
+            layout {
+                HStack(spacing: 8) {
+                    Glyph(symbol: .link, size: 18, tint: SwevoStyle.accent)
+                    TextField("Video URL", text: Binding(get: { link }, set: {
+                        link = $0
+                        linkError = nil
+                    }))
+                    .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .focused($linkFocused).submitLabel(.go).onSubmit { openLink(link) }
+                    .font(.capture(.subheadline)).environment(\.layoutDirection, .leftToRight)
+                    .accessibilityLabel("Video link")
+                    .accessibilityIdentifier("home.videoLink")
+                    if !link.isEmpty {
+                        IconButton(symbol: .close, label: "Clear link") {
+                            link = ""
+                            linkError = nil
+                            linkFocused = true
+                        }
+                    }
+                }
+                .padding(.leading, 14).frame(minHeight: 54)
+                .keyboardInputRegion("home-video-link")
+
+                HStack(spacing: 4) {
+                    Button("Paste", action: pasteLink).font(.capture(.footnote, weight: .semibold))
+                        .foregroundStyle(SwevoStyle.accent)
+                        .fixedSize(horizontal: !stacks, vertical: true).padding(.horizontal, 4)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle()).buttonStyle(PressStyle())
+                        .accessibilityIdentifier("home.pasteLink")
+                    Button { openLink(link) } label: {
+                        Glyph(symbol: .play, size: 16, tint: hasLink ? SwevoStyle.ink : SwevoStyle.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(hasLink ? SwevoStyle.accent : SwevoStyle.raised, in: Circle())
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(PressStyle()).disabled(!hasLink || searchRequest != nil)
+                        .accessibilityLabel("Open link")
+                        .accessibilityIdentifier("home.openLesson")
+                }.padding(.horizontal, 6).padding(.vertical, 4)
+            }
+            .swevoGlass(cornerRadius: 16)
+            .overlay {
+                RoundedRectangle(cornerRadius: 16).strokeBorder(linkFocused ? SwevoStyle.accent : Color.clear)
+                    .allowsHitTesting(false)
+            }
+            if let linkError { ErrorNote(message: linkError) }
+        }
+    }
+
+    private func pasteLink() {
+        guard let value = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            linkError = "Copy a video link first."
+            return
+        }
+        link = value
+        linkError = nil
+    }
+
+    private func openLink(_ value: String) {
+        let query = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, searchRequest == nil else { return }
+        link = query
+        linkError = nil
+        linkFocused = false
+        searchRequest = LessonSearch(query: query)
+    }
+
+    @ViewBuilder private func historySection(_ history: ArraySlice<RecentVideo>, hasVideos: Bool) -> some View {
+        if !history.isEmpty || !library.history.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if !history.isEmpty { SectionLabel(title: "Video history").accessibilityAddTraits(.isHeader) }
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    ForEach(history) { video in
+                        recentButton(video, featured: false)
+                        Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+                    }
+                }
+                if !library.history.isEmpty { previousLinks }
+            }
+        } else if !hasVideos {
+            EmptyStateCopy(message: "Videos you open appear here.")
+        }
+    }
+
+    private var previousLinks: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionLabel(title: "Link history").accessibilityAddTraits(.isHeader)
+            LazyVStack(alignment: .leading, spacing: 4) {
+                ForEach(library.history) { visit in
+                    HStack(spacing: 10) {
+                        Button { openLink(visit.link) } label: {
+                            HStack(spacing: 12) {
+                                Glyph(symbol: .link, size: 19, tint: SwevoStyle.secondary)
+                                    .frame(width: 64, height: 42)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(verbatim: visit.title).font(.capture(.subheadline, weight: .semibold))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    LocalizedDateText(date: visit.date).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                            }.frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(PressStyle())
+                        IconButton(symbol: .close, label: "Remove history item") { library.removeVisit(visit) }
+                    }
+                }
+            }
+            Button("Clear link history") { library.clearHistory() }
+                .buttonStyle(MatteActionStyle())
+        }
+    }
+
+    private var shortcuts: some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                                                  : AnyLayout(HStackLayout(spacing: 16))
+        return VStack(alignment: .leading, spacing: 6) {
+            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+            layout {
+                shortcut("View files", glyph: .library, action: openLibrary)
+                shortcut("Browse and practice", glyph: .bookmark, action: openLearning)
+            }
+        }
+    }
+
+    private func shortcut(_ title: String, glyph: SwevoGlyph, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Glyph(symbol: glyph, size: 17, tint: SwevoStyle.accent)
+                LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+        }.buttonStyle(PressStyle())
+    }
+
+    @ViewBuilder private func recentButton(_ video: RecentVideo, featured: Bool) -> some View {
         switch video {
         case .local(let movie):
-            VideoFileButton(url: library.url(for: movie), filename: movie.displayFilename, date: video.date, featured: featured) {
+            VideoFileButton(url: library.url(for: movie), filename: movie.displayFilename, date: video.date,
+                            featured: featured,
+                            detail: !featured && movie.rangeMarks?.isEmpty == false ? "Saved ranges" : nil) {
                 edit(movie)
             }
         case .offline(let download):
@@ -79,19 +232,41 @@ struct HomeView: View {
                     return
                 }
                 let clip = offline.playable(download.clip)
-                offlinePlayer = PlayerRoute(clips: [clip], startID: clip.id)
+                player = PlayerRoute(clips: [clip], startID: clip.id)
+            }
+        case .online(let visit):
+            let entry = VideoFileButton(url: visit.clip.playbackURL, filename: visit.clip.title, date: video.date,
+                                       featured: featured, fallbackCover: visit.clip.coverURL) {
+                if api.session == nil, offline.cached(visit.id) == nil {
+                    library.error = "Connect to replay this video."
+                } else {
+                    let clip = offline.playable(visit.clip)
+                    player = PlayerRoute(clips: [clip], startID: clip.id)
+                }
+            }
+            let remove = IconButton(symbol: .close, label: "Remove history item") { library.removeWatch(visit) }
+            if featured && !typeSize.isAccessibilitySize {
+                entry.overlay(alignment: .topTrailing) {
+                    remove.swevoGlass(cornerRadius: 22).padding(8)
+                }
+            } else {
+                HStack(spacing: 10) {
+                    entry
+                    remove
+                }
             }
         }
     }
 }
 
 private enum RecentVideo: Identifiable {
-    case local(PracticeRecording), offline(OfflineVideo)
+    case local(PracticeRecording), offline(OfflineVideo), online(WatchedVideo)
 
     var id: String {
         switch self {
         case .local(let movie): "file-\(movie.id.uuidString)"
-        case .offline(let download): "offline-\(download.id)"
+        case .offline(let download): "remote-\(download.id)"
+        case .online(let visit): "remote-\(visit.id)"
         }
     }
 
@@ -99,73 +274,50 @@ private enum RecentVideo: Identifiable {
         switch self {
         case .local(let movie): movie.lastOpenedAt ?? movie.date
         case .offline(let download): download.lastOpenedAt ?? .distantPast
+        case .online(let visit): visit.date
         }
     }
 }
 
 struct LearningView: View {
     @EnvironmentObject private var api: APIClient
-    @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var commerce: CommerceStore
-    @EnvironmentObject private var quota: QuotaStore
     @Environment(\.dismiss) private var dismiss
-    @SceneStorage("home.linkDraft") private var link = ""
-    @FocusState private var linkFocused: Bool
     @State private var error: String?
-    @State private var linkFailure = ""
-    @State private var showingLinkFailure = false
     @State private var channel: ChannelRoute?
-    @State private var searchRequest: LessonSearch?
+    @State private var browsing = false
     @State private var channels: [LandingInfo] = []
     @State private var channelRetry = 0
-    @State private var showingLinkGuide = false
     @State private var showingGuide = false
     @State private var showingPlanner = false
 
     var body: some View {
         let request = ChannelRequest(links: commerce.release?.lcList?["us"] ?? [], attempt: channelRetry)
-        ScenePage(artwork: "SceneLessons", depth: 116, openingGap: 0, artworkOpacity: 0.45) { _ in
-            SceneTitle("Tutorials & practice", size: 34).padding(.trailing, 50)
-        } content: { _ in
+        ScenePage(artwork: "SceneLessons", depth: 96, artworkOpacity: 0.58) { _ in
             VStack(alignment: .leading, spacing: 20) {
-                linkComposer
                 connection
                 VStack(spacing: 0) {
-                    LearningLink(symbol: .play, title: "Watch tutorials") {
-                        linkFocused = false
-                        searchRequest = LessonSearch()
+                    LearningLink(symbol: .play, title: "Browse videos") {
+                        browsing = true
                     }
                     Divider().overlay(SwevoStyle.line)
                     LearningLink(symbol: .edit, title: "Shot planner") {
-                        linkFocused = false
                         showingPlanner = true
                     }
                     Divider().overlay(SwevoStyle.line)
                     LearningLink(symbol: .folder, title: "Shot field notes") {
-                        linkFocused = false
                         showingGuide = true
                     }
                     .accessibilityIdentifier("shotGuide.open")
                 }
                 referenceFootage
-                recentLinks
             }
         }
             .sceneDismiss { dismiss() }
-            .scrollDismissesKeyboard(.interactively)
-            .dismissKeyboardOnOutsideTap($linkFocused, scope: "lesson-link-input")
             .sheet(item: $channel) { ChannelView(route: $0) }
-            .fullScreenCover(item: $searchRequest) { request in
-                DiscoverView(initialSearch: request.query, canDismiss: true, openLessonEntry: { searchRequest = nil }) { query, clip in
-                    if query.nilIfBlank != nil { library.record(link: query, title: clip.title) }
-                }
+            .fullScreenCover(isPresented: $browsing) {
+                DiscoverView(canDismiss: true)
             }
-            .fullScreenCover(isPresented: $showingLinkFailure) {
-                AccountDecisionDialog(title: "Lesson search", message: linkFailure,
-                                      confirmTitle: "Back to search", confirm: { showingLinkFailure = false })
-                    .presentationBackground(.clear)
-            }
-            .sheet(isPresented: $showingLinkGuide) { LinkGuideSheet() }
             .sheet(isPresented: $showingPlanner) { ShotPlannerView() }
             .sheet(isPresented: $showingGuide) { ShotGuideView() }
             .task(id: request) {
@@ -185,7 +337,7 @@ struct LearningView: View {
     @ViewBuilder private var connection: some View {
         if api.session == nil { ConnectionPanel() }
         if let error {
-            MessagePanel(title: "Couldn’t load lesson collections", message: error, actionTitle: "Try again") {
+            MessagePanel(title: "Couldn’t load collections", message: error, actionTitle: "Try again") {
                 channelRetry += 1
             }
         }
@@ -194,7 +346,7 @@ struct LearningView: View {
     @ViewBuilder private var referenceFootage: some View {
         if !channels.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                LocalizedText("Lesson collections").font(.capture(.title3, display: true))
+                LocalizedText("Video collections").font(.capture(.headline))
                     .accessibilityAddTraits(.isHeader)
                 ForEach(channels.indices, id: \.self) { index in
                     let item = channels[index]
@@ -217,155 +369,19 @@ struct LearningView: View {
         }
     }
 
-    private var linkComposer: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionLabel(title: "Lesson link or code")
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 0) {
-                Glyph(symbol: .link, size: 17, tint: SwevoStyle.accent).padding(.leading, 12)
-                TextField("Paste a link or type a code", text: $link, axis: .vertical)
-                    .lineLimit(1...3).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .focused($linkFocused).font(.capture(.subheadline)).foregroundStyle(SwevoStyle.paper)
-                    .tint(SwevoStyle.accent)
-                    .padding(.horizontal, 10).padding(.vertical, 13)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityLabel(LocalizedStringKey("Lesson link or code"))
-                if !link.isEmpty {
-                    Button {
-                        link = ""
-                        linkFocused = true
-                    } label: {
-                        Glyph(symbol: .close, size: 13, tint: SwevoStyle.paper)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }.buttonStyle(ComposerPressStyle())
-                        .accessibilityLabel(LocalizedStringKey("Clear link or code"))
-                        .accessibilityIdentifier("home.clearLink")
-                }
-            }
-                .environment(\.layoutDirection, .leftToRight)
-                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 12))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12).strokeBorder(linkFocused ? SwevoStyle.accent : SwevoStyle.line)
-                        .allowsHitTesting(false)
-                }
-                .keyboardInputRegion("lesson-link-input")
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) { pasteButton; openLessonButton }
-                VStack(alignment: .leading, spacing: 8) { openLessonButton; pasteButton }
-            }
-            HStack(spacing: 10) {
-                allowanceLabel
-                Spacer(minLength: 0)
-                Button { linkFocused = false; showingLinkGuide = true } label: {
-                    LocalizedText("Link help").font(.capture(.caption, weight: .semibold))
-                        .underline().foregroundStyle(SwevoStyle.accent)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }.buttonStyle(ComposerPressStyle())
-                    .accessibilityIdentifier("home.linkHelp")
-            }
-        }
-    }
-    private var canOpenLink: Bool { searchRequest == nil && link.nilIfBlank != nil }
-    private var openLessonButton: some View {
-        Button(action: resolve) {
-            HStack(spacing: 10) {
-                LocalizedText("Find lesson").font(.capture(.subheadline, weight: .bold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Glyph(symbol: .play, size: 14, tint: canOpenLink ? SwevoStyle.ink : SwevoStyle.secondary)
-            }.padding(.horizontal, 14).padding(.vertical, 10)
-                .frame(minHeight: 44)
-                .foregroundStyle(canOpenLink ? SwevoStyle.ink : SwevoStyle.secondary)
-                .background(canOpenLink ? SwevoStyle.accent : SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 12))
-                .contentShape(Rectangle())
-        }.buttonStyle(ComposerPressStyle()).disabled(!canOpenLink)
-            .accessibilityIdentifier("home.openLesson")
-    }
-    @ViewBuilder private var allowanceLabel: some View {
-        if api.session != nil {
-            LocalizedText(quota.usage == nil ? "Loading…" : commerce.premium || quota.unlimited ? "Unlimited viewing today" : "\(quota.watchesLeft) views left today")
-                .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-    private var pasteButton: some View {
-        Button(action: pasteCopiedLink) {
-            LocalizedText("Paste link").font(.capture(.footnote, weight: .semibold))
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .frame(minHeight: 44)
-                .foregroundStyle(SwevoStyle.paper)
-                .background { CaptureSurface(tone: .plum) }
-                .contentShape(Rectangle())
-        }.buttonStyle(ComposerPressStyle())
-            .accessibilityIdentifier("home.pasteLink")
-    }
-    private func pasteCopiedLink() {
-        guard let text = UIPasteboard.general.string, text.nilIfBlank != nil else {
-            showLinkFailure("Copy a lesson link or code, then tap Paste link.")
-            return
-        }
-        link = text
-    }
-    @ViewBuilder private var recentLinks: some View {
-        if !library.history.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    LocalizedText("Recently opened").font(.capture(.headline))
-                    Spacer()
-                    Button("Clear") { library.clearHistory() }
-                        .buttonStyle(MatteActionStyle())
-                }
-                ForEach(library.history.prefix(5)) { visit in
-                    HStack {
-                        Button { link = visit.link; resolve() } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(verbatim: visit.title).font(.capture(.headline)).lineLimit(1)
-                                Text(verbatim: visit.link).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary).lineLimit(1)
-                            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                .contentShape(Rectangle())
-                        }.buttonStyle(PressStyle()).disabled(searchRequest != nil)
-                        IconButton(symbol: .close, label: "Remove history item") { library.removeVisit(visit) }
-                    }
-                }
-            }
-        }
-    }
-    private func resolve() {
-        guard let text = link.nilIfBlank, searchRequest == nil else { return }
-        linkFocused = false
-        guard api.session != nil else {
-            showLinkFailure("Swevo hasn’t connected yet. Try again in a moment.")
-            return
-        }
-        // Preserve exactly what was entered. Search owns loading, errors and cursor
-        // pagination; do not fall back to the old landing-page resolver.
-        searchRequest = LessonSearch(query: text)
-    }
-    private func showLinkFailure(_ message: String) {
-        linkFailure = message
-        showingLinkFailure = true
-    }
 }
 
 private struct LearningLink: View {
     let symbol: SwevoGlyph
     let title: String
-    var detail: String? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Glyph(symbol: symbol, size: 18, tint: SwevoStyle.secondary)
-                VStack(alignment: .leading, spacing: 3) {
-                    LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
-                    if let detail {
-                        LocalizedText(detail).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                    }
-                }.fixedSize(horizontal: false, vertical: true)
+                LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Glyph(symbol: .back, size: 13, tint: SwevoStyle.secondary).rotationEffect(.degrees(180))
             }
@@ -386,9 +402,7 @@ private struct ShotPlannerView: View {
     @State private var showingPresets = false
 
     var body: some View {
-        ScenePage(artwork: nil, depth: 64, openingGap: 0) { _ in
-            SceneTitle("Shot planner", size: 34).padding(.trailing, 50)
-        } content: { _ in
+        ScenePage(depth: 44) { _ in
             VStack(alignment: .leading, spacing: 14) {
                 SectionLabel(title: "Camera move").accessibilityAddTraits(.isHeader)
                 ChoiceStrip(values: ShotMovement.allCases.map(\.label), selected: movement.label) { label in
@@ -494,9 +508,7 @@ private struct ShotPresetsView: View {
     }
 
     var body: some View {
-        ScenePage(artwork: nil, depth: 64, openingGap: 0) { _ in
-            SceneTitle("Shot presets", size: 40).padding(.trailing, 50)
-        } content: { _ in
+        ScenePage(depth: 44) { _ in
             VStack(alignment: .leading, spacing: 16) {
                 LocalizedText("Save one setup per camera move on this device.")
                     .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
@@ -592,12 +604,6 @@ private struct ShotPresetsView: View {
 }
 
 // The disabled composer button has its own color treatment.
-private struct ComposerPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.opacity(configuration.isPressed ? 0.8 : 1)
-    }
-}
-
 private struct LessonSearch: Identifiable {
     let id = UUID()
     let query: String
@@ -626,14 +632,14 @@ struct ChannelView: View {
     var body: some View {
         ScenePage(artwork: emptyChannel ? "EmptyLessons" : nil, depth: emptyChannel ? 134 : 64,
                   openingGap: 0, artworkOpacity: 0.45) { _ in
-            Text(verbatim: route.title).font(.capture(.largeTitle, weight: .semibold))
+            Text(verbatim: route.title).font(.capture(.headline))
                 .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
                 .padding(.trailing, 50)
         } content: { _ in
             LazyVStack(spacing: 14) {
                 if emptyChannel {
                     VStack(alignment: .leading, spacing: 14) {
-                        EmptyStateCopy(title: "No lessons available", message: "This channel has no available videos.")
+                        EmptyStateCopy(message: "This channel has no available videos.")
                         EmptyStateAction(title: "Back", symbol: .back) { dismiss() }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -653,7 +659,7 @@ struct ChannelView: View {
                 }
                 if let error { ErrorNote(message: error) }
                 if hasMore {
-                    let title = loading ? "Loading lessons…" : error == nil ? "Load more" : "Try again"
+                    let title = loading ? "Loading videos…" : error == nil ? "Load more" : "Try again"
                     ActionButton(title: title, primary: false) { Task { await load() } }
                         .disabled(loading)
                 }
@@ -683,24 +689,5 @@ struct ChannelView: View {
         } else if let clip = item.clip(channel: route.title) {
             player = PlayerRoute(clips: items.compactMap { $0.clip(channel: route.title) }, startID: clip.id, continuesRecommendations: true)
         } else { error = "This item does not contain a playable video." }
-    }
-}
-
-struct LinkGuideSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        ScenePage(artwork: nil, depth: 64, openingGap: 0) { _ in
-            SceneTitle("Use a link or code", size: 40).padding(.trailing, 50)
-        } content: { _ in
-            VStack(alignment: .leading, spacing: 20) {
-                FeatureRow(symbol: .link, title: "1. Copy the link or code", detail: "Use the Swevo lesson link or code you received.")
-                FeatureRow(symbol: .search, title: "2. Paste or type it", detail: "If you type the code, match the uppercase and lowercase letters.")
-                FeatureRow(symbol: .play, title: "3. Find the lesson", detail: "Tap Find lesson, then swipe up or down to browse the results.")
-                LocalizedText("If the lesson doesn’t appear, check the link or code and try again.")
-                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-                ActionButton(title: "Back to search") { dismiss() }
-            }
-        }
-        .sceneDismiss { dismiss() }
     }
 }

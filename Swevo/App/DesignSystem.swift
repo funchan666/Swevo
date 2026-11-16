@@ -2,15 +2,15 @@ import SwiftUI
 import UIKit
 
 enum SwevoStyle {
-    static let background = Color(red: 0.084, green: 0.083, blue: 0.093)
-    static let surface = Color(red: 0.124, green: 0.121, blue: 0.135)
-    static let raised = Color(red: 0.180, green: 0.173, blue: 0.191)
-    static let accent = Color(red: 1, green: 0.769, blue: 0.624)
-    static let ink = Color(red: 0.133, green: 0.086, blue: 0.122)
-    static let secondary = Color(red: 0.800, green: 0.749, blue: 0.776)
-    static let paper = Color(red: 0.988, green: 0.949, blue: 0.917)
-    static let paperSecondary = Color(red: 0.365, green: 0.247, blue: 0.314)
-    static let mist = Color(red: 0.929, green: 0.831, blue: 0.828)
+    static let background = Color("LaunchBackground")
+    static let surface = Color(red: 0.137, green: 0.129, blue: 0.118)
+    static let raised = Color(red: 0.188, green: 0.173, blue: 0.153)
+    static let accent = Color(red: 0.906, green: 0.741, blue: 0.502)
+    static let ink = Color(red: 0.133, green: 0.106, blue: 0.075)
+    static let secondary = Color(red: 0.784, green: 0.745, blue: 0.686)
+    static let paper = Color(red: 0.965, green: 0.937, blue: 0.894)
+    static let paperSecondary = Color(red: 0.396, green: 0.341, blue: 0.275)
+    static let mist = Color(red: 0.906, green: 0.851, blue: 0.773)
     static let line = paper.opacity(0.14)
     static let danger = Color(red: 1, green: 0.650, blue: 0.670)
     static let pageMargin: CGFloat = 20
@@ -120,27 +120,43 @@ struct ScenePage<Opening: View, PageContent: View>: View {
         GeometryReader { container in
             let widthAdjustment = artwork == nil ? 0 : min(72, max(-32, (container.size.width - 390) * 0.22))
             let height = verticalSizeClass == .compact ? min(depth, 178) : max(44, depth + widthAdjustment)
+            let openingTopPadding: CGFloat = 10
             ScrollView {
                 VStack(spacing: 0) {
-                    opening(height)
-                        .frame(maxWidth: .infinity, minHeight: height, alignment: .bottomLeading)
-                        .pageHorizontalMargins()
-                        .frame(maxWidth: 680)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, container.safeAreaInsets.top + 10)
-                        .padding(.bottom, openingGap)
-                        .background {
-                            if let artwork { SceneArtwork(name: artwork).opacity(artworkOpacity) }
-                        }
+                    if depth > 0 || artwork != nil {
+                        opening(height)
+                            .frame(maxWidth: .infinity, minHeight: height, alignment: .bottomLeading)
+                            .pageHorizontalMargins()
+                            .frame(maxWidth: 680)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, openingTopPadding)
+                            .padding(.bottom, openingGap)
+                    }
                     content(container).swevoPage()
+                        .background { SwevoStyle.background }
                 }
             }
-            // Only the scroll surface enters the status area. The opening's controls
-            // start below the owning container's safe inset and scroll with the artwork.
-            .ignoresSafeArea(.container, edges: .top)
+            .clipped()
+            .background(alignment: .top) {
+                // Let the artwork reach the screen edge while the scroll viewport respects the safe area.
+                if let artwork {
+                    SceneArtwork(name: artwork)
+                        .opacity(artworkOpacity)
+                        .ignoresSafeArea(.container, edges: .top)
+                        .frame(height: height + openingTopPadding + openingGap)
+                }
+            }
         }
         .swevoScreenBackground()
         .foregroundStyle(SwevoStyle.paper)
+    }
+}
+
+extension ScenePage where Opening == EmptyView {
+    init(artwork: String? = nil, depth: CGFloat = 0, artworkOpacity: Double = 1,
+         @ViewBuilder content: @escaping (GeometryProxy) -> PageContent) {
+        self.init(artwork: artwork, depth: depth, openingGap: 0, artworkOpacity: artworkOpacity,
+                  opening: { _ in EmptyView() }, content: content)
     }
 }
 
@@ -522,7 +538,7 @@ struct CaptureSurface: View {
     }
 }
 
-/// Surfaces for controls placed on the blush paper card.
+/// Surfaces for controls placed on light cards.
 struct PaperSurface: View {
     enum Tone { case accent, plum, inkOnPaper, mistOnPaper }
     let tone: Tone

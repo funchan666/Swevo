@@ -148,7 +148,7 @@ final class OfflineStore: NSObject, ObservableObject {
         var next = index
         next.videos[position].lastOpenedAt = Date()
         do { try persist(next) }
-        catch { error = "Your changes could not be saved on this device. Please try again." }
+        catch { self.error = "Your changes could not be saved on this device. Please try again." }
     }
     func playable(_ clip: LessonClip) -> LessonClip {
         guard let video = cached(clip.id) else { return clip }
@@ -226,7 +226,7 @@ final class OfflineStore: NSObject, ObservableObject {
             progress = 0
             if forExport, isHLS {
                 let destination = root.appendingPathComponent(transfer.id.uuidString).appendingPathExtension("mp4")
-                let task = Task { @MainActor in
+                let task = Task { @MainActor [self] in
                     do {
                         try await LessonStreamExport.Job().convert(source, destination: destination) { [weak self] value in
                             await self?.updateProgress(id: transfer.id, value: value)

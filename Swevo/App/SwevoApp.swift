@@ -57,7 +57,7 @@ struct SwevoStartupHost: View {
 
     var body: some View {
         ZStack {
-            Color("LaunchBackground").ignoresSafeArea()
+            SwevoStyle.background.ignoresSafeArea()
             // Mount once so local content and authentication prepare while the
             // bounded app-open opportunity runs, without rebuilding navigation.
             SwevoRootView()
@@ -96,7 +96,7 @@ struct SwevoStartupView: View {
             .ignoresSafeArea(.container, edges: .all)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(LocalizedStringKey("Swevo is starting"))
-            .background(Color("LaunchBackground").ignoresSafeArea())
+            .background(SwevoStyle.background.ignoresSafeArea())
     }
 }
 
@@ -107,8 +107,7 @@ enum SwevoTab: Int, CaseIterable, Hashable {
     var identifier: String { "tab.\(name.lowercased())" }
 }
 
-// System tab item: title and original image, so the bar can follow iPhone Duo's
-// vertical bar layout and move titles into the system overflow when needed.
+// Keep a semantic title for VoiceOver and the system's overflow labels.
 private struct SwevoTabItem: View {
     let tab: SwevoTab
     @Environment(\.locale) private var locale
@@ -118,6 +117,8 @@ private struct SwevoTabItem: View {
         } icon: {
             Image(tab.artwork).renderingMode(.template)
         }
+        .labelStyle(.iconOnly)
+        .accessibilityLabel(Text(verbatim: L10n.text(tab.name, language: AppLanguage.from(locale))))
         .accessibilityIdentifier(tab.identifier)
     }
 }
@@ -132,33 +133,23 @@ private extension View {
 }
 
 private struct SwevoTabDock: View {
-    static let maximumWidth: CGFloat = 488
+    static let maximumWidth: CGFloat = 304
     @Binding var selection: SwevoTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var highlight
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             ForEach(SwevoTab.allCases, id: \.self) { tab in
                 let selected = selection == tab
                 Button { selection = tab } label: {
-                    VStack(spacing: 3) {
-                        TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.accent : SwevoStyle.paper)
-                            .frame(width: 22, height: 22)
-                        LocalizedText(tab.name)
-                            .font(.capture(.caption2, weight: selected ? .semibold : .medium))
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.horizontal, 3)
-                    .padding(.vertical, 5)
-                    .frame(minWidth: 44, maxWidth: .infinity, minHeight: 52)
-                    .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
+                    TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.ink : SwevoStyle.paper)
+                    .frame(width: 24, height: 24)
+                    .frame(minWidth: 44, maxWidth: .infinity, minHeight: 48)
                     .background {
                         if selected {
                             let shape = RoundedRectangle(cornerRadius: 17)
-                            shape.fill(SwevoStyle.accent.opacity(0.16))
-                                .overlay { shape.strokeBorder(SwevoStyle.accent.opacity(0.35)) }
+                            shape.fill(SwevoStyle.accent)
                                 .matchedGeometryEffect(id: "selected-tab", in: highlight)
                                 .transition(.identity)
                                 .allowsHitTesting(false)
@@ -167,8 +158,9 @@ private struct SwevoTabDock: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(LocalizedStringKey(tab.name))
-                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
                 .accessibilityIdentifier(tab.identifier)
             }
         }
@@ -184,6 +176,7 @@ private struct SwevoTabDock: View {
 private struct EditorPresentation: Identifiable {
     let id = UUID()
     let movie: PracticeRecording?
+    var tool: VideoTool = .studio
 }
 
 struct SwevoRootView: View {
@@ -205,14 +198,16 @@ struct SwevoRootView: View {
         GeometryReader { container in
             let nativeBar = usesNativeTabBar(in: container)
             TabView(selection: $tab) {
-                HomeView(importing: $importing, edit: { editing = EditorPresentation(movie: $0) }, openLibrary: {
+                HomeView(importing: $importing, edit: { editing = EditorPresentation(movie: $0) }, review: {
+                    editing = EditorPresentation(movie: $0, tool: .ranges)
+                }, openLibrary: {
                     libraryFilter = "Imports"
                     tab = .library
                 }, openLearning: { showingLearning = true })
                     .swevoTab(.home, nativeBar: nativeBar)
                 ToolsView().swevoTab(.tools, nativeBar: nativeBar)
                 LibraryView(edit: { editing = EditorPresentation(movie: $0) },
-                            watchTutorials: { showingLessons = true },
+                            browseVideos: { showingLessons = true },
                             openEditor: { editing = EditorPresentation(movie: nil) },
                             filter: $libraryFilter, importing: $importing)
                     .swevoTab(.library, nativeBar: nativeBar)
@@ -227,16 +222,15 @@ struct SwevoRootView: View {
         }
             .tint(SwevoStyle.accent)
             .foregroundStyle(SwevoStyle.paper)
-            .sheet(item: $editing) { EditorSheet(initialMovie: $0.movie) }
+            .sheet(item: $editing) { EditorSheet(initialMovie: $0.movie, initialTool: $0.tool) }
             .sheet(isPresented: $showingLearning) { LearningView() }
             .fullScreenCover(isPresented: $showingLessons, onDismiss: {
                 if returnToLessonEntry {
                     returnToLessonEntry = false
                     tab = .home
-                    showingLearning = true
                 }
             }) {
-                DiscoverView(canDismiss: true, openLessonEntry: {
+                DiscoverView(canDismiss: true, returnToLinkInput: {
                     returnToLessonEntry = true
                     showingLessons = false
                 })
@@ -272,7 +266,7 @@ struct SwevoRootView: View {
     }
 
     private func usesNativeTabBar(in container: GeometryProxy) -> Bool {
-        if environment.dynamicTypeSize.isAccessibilitySize || container.size.width < 224 { return true }
+        if container.size.width < 224 { return true }
         guard #available(iOS 27.1, *) else { return false }
         if environment.toolbarVerticalEdge != nil { return true }
 

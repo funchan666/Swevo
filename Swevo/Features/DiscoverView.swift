@@ -1,8 +1,7 @@
 import OSLog
 import SwiftUI
 
-struct BrowserLessonSearch: Identifiable, Equatable {
-    let id = UUID()
+struct BrowserLessonSearch: Equatable {
     let query: String
     var url: URL? {
         var address = URLComponents(string: "https://www.google.com/search")
@@ -27,7 +26,7 @@ final class FeedStore: ObservableObject {
     private var cursor: String?
     private var roundVideoIDs = Set<String>()
     private var requestQuery = ""
-    private(set) var query = ""
+    private var query = ""
     private var generation = UUID()
     private let diagnostics = Logger(subsystem: "app.swevo", category: "LessonFeed")
 
@@ -93,12 +92,12 @@ final class FeedStore: ObservableObject {
             if entries.isEmpty {
                 if sawInvalidMedia {
                     error = query.nilIfBlank == nil ? "No playable videos were returned. Try again."
-                                                  : "The lesson source returned no playable video. Check the link or try again."
+                                                  : "Check the link and try again."
                 } else if requestQuery.nilIfBlank != nil {
                     emptySearch = BrowserLessonSearch(query: requestQuery)
                 }
             }
-            if !entries.isEmpty { error = "No more lessons are available right now. Try again." }
+            if !entries.isEmpty { error = "No more videos are available right now. Try again." }
         } catch is CancellationError {
             // Leaving a screen/search is not a service failure.
         } catch {
@@ -111,8 +110,7 @@ struct DiscoverView: View {
     @Environment(\.dismiss) private var dismiss
     private let canDismiss: Bool
     private let onExit: (() -> Void)?
-    private let openLessonEntry: (() -> Void)?
-    private let onSearchResult: ((String, LessonClip) -> Void)?
+    private let returnToLinkInput: (() -> Void)?
     @EnvironmentObject private var offline: OfflineStore
     private var displayEntries: [PlaybackQueueEntry] {
         feed.entries.map { PlaybackQueueEntry(id: $0.id, clip: offline.playable($0.clip)) }
@@ -125,17 +123,13 @@ struct DiscoverView: View {
     @State private var search = ""
     @State private var visible = false
     @State private var activeID: String?
-    @State private var recordedQuery: String?
-    @State private var openedBrowserSearchID: UUID?
     @State private var browserSearch: PolicyDocument?
     @State private var loadedUserID: String?
     init(initialSearch: String = "", canDismiss: Bool = false, onExit: (() -> Void)? = nil,
-         openLessonEntry: (() -> Void)? = nil,
-         onSearchResult: ((String, LessonClip) -> Void)? = nil) {
+         returnToLinkInput: (() -> Void)? = nil) {
         self.canDismiss = canDismiss
         self.onExit = onExit
-        self.openLessonEntry = openLessonEntry
-        self.onSearchResult = onSearchResult
+        self.returnToLinkInput = returnToLinkInput
         _search = State(initialValue: initialSearch)
     }
     var body: some View {
@@ -164,7 +158,7 @@ struct DiscoverView: View {
                                 if !feed.entries.isEmpty {
                                     VStack(spacing: 16) {
                                         if let error = feed.error { ErrorNote(message: error) }
-                                        ActionButton(title: feed.loading ? "Loading lessons…" : feed.error == nil ? "Load more" : "Try again",
+                                        ActionButton(title: feed.loading ? "Loading videos…" : feed.error == nil ? "Load more" : "Try again",
                                                      primary: false) { Task { await feed.load(api: api) } }
                                             .disabled(feed.loading)
                                     }.padding(28).padding(container.safeAreaInsets)
@@ -198,19 +192,13 @@ struct DiscoverView: View {
                     activeID = entries[previous.count].id
                 } else if !entries.contains(where: { $0.id == activeID }) { activeID = entries.first?.id }
                 players.update(entries: displayEntries, selectedID: activeID)
-                if let first = entries.first?.clip, recordedQuery != feed.query {
-                    recordedQuery = feed.query
-                    onSearchResult?(feed.query, first)
-                }
             }
             .onDisappear { visible = false; feed.invalidatePendingLoad(); players.releaseAll() }
             .fullScreenCover(item: $browserSearch) { document in
                 PolicyBrowser(document: document, webSearch: true)
             }
-            .onChange(of: feed.emptySearch) { _, _ in openPendingBrowserSearch() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { players.suspend() }
-                else { openPendingBrowserSearch() }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in players.trimMemory() }
     }
@@ -218,48 +206,43 @@ struct DiscoverView: View {
     private var lessonStatusPage: some View {
         let ready = loadedUserID != nil && loadedUserID == api.session?.userId.value
         let empty = ready && !feed.loading && feed.error == nil
-        let noResultsTitle = feed.emptySearch != nil ? "No matching lessons" : "No lessons available"
-        let pageTitle = search.nilIfBlank == nil ? "Watch tutorials" : "Lesson search"
         return ScenePage(artwork: empty ? "EmptyLessons" : "SceneLessons", depth: 128,
-                         openingGap: 0, artworkOpacity: 0.50) { _ in
-            SceneTitle(empty ? noResultsTitle : pageTitle, size: 34)
-                .padding(.trailing, 50)
-        } content: { _ in
+                         artworkOpacity: 0.50) { _ in
             if api.session == nil {
-                ConnectionPanel(loadingTitle: "Connecting your lesson feed…")
+                ConnectionPanel(loadingTitle: "Connecting to the video service…")
             } else if feed.loading || !ready {
                 HStack(spacing: 12) {
                     ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
-                    LocalizedText(search.nilIfBlank == nil ? "Loading lessons…" : "Searching for lessons…")
+                    LocalizedText(search.nilIfBlank == nil ? "Loading videos…" : "Finding video…")
                         .font(.capture(.subheadline))
                 }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             } else if let error = feed.error {
                 VStack(alignment: .leading, spacing: 12) {
-                    MessagePanel(title: "Couldn’t load lessons", message: error, actionTitle: "Try again") {
+                    MessagePanel(title: "Couldn’t load videos", message: error, actionTitle: "Try again") {
                         Task { await loadInitialFeed() }
                     }
-                    if search.nilIfBlank != nil, let openLessonEntry {
-                        EmptyStateAction(title: "Use a link or code", symbol: .link, action: openLessonEntry)
+                    if search.nilIfBlank != nil, let returnToLinkInput {
+                        EmptyStateAction(title: "Edit link", symbol: .link, action: returnToLinkInput)
                     }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 16) {
                     if let request = feed.emptySearch {
-                        EmptyStateCopy(message: "Search the web with the link or code you entered.")
-                        EmptyStateAction(title: "Search in browser", symbol: .search) { openBrowserSearch(request) }
+                        EmptyStateCopy(title: "No matching video", message: "Check the link and try again.")
+                        if let returnToLinkInput {
+                            EmptyStateAction(title: "Edit link", symbol: .link, action: returnToLinkInput)
+                        }
+                        if WebAddress.media(request.query) == nil, WebAddress.landingCode(request.query) != nil {
+                            EmptyStateAction(title: "Search in browser", symbol: .search) { openBrowserSearch(request) }
+                        }
                     } else {
+                        LocalizedText("No videos available").font(.capture(.headline))
+                            .fixedSize(horizontal: false, vertical: true)
                         EmptyStateAction(title: "Try again", symbol: .feed) {
                             Task { await loadInitialFeed() }
                         }
-                        if let openLessonEntry {
-                            Button(action: openLessonEntry) {
-                                LocalizedText("Use a link or code")
-                                    .font(.capture(.subheadline, weight: .semibold))
-                                    .foregroundStyle(SwevoStyle.accent)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(minHeight: 44, alignment: .leading)
-                                    .contentShape(Rectangle())
-                            }.buttonStyle(PressStyle())
+                        if let returnToLinkInput {
+                            EmptyStateAction(title: "Edit link", symbol: .link, action: returnToLinkInput)
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -276,14 +259,8 @@ struct DiscoverView: View {
         activeID = feed.entries.first?.id
     }
 
-    private func openPendingBrowserSearch() {
-        guard visible, scenePhase == .active, let request = feed.emptySearch,
-              openedBrowserSearchID != request.id else { return }
-        openBrowserSearch(request)
-    }
     private func openBrowserSearch(_ request: BrowserLessonSearch) {
         guard let url = request.url else { return }
-        openedBrowserSearchID = request.id
         players.suspend()
         browserSearch = PolicyDocument(title: "Web search", url: url)
     }
@@ -345,7 +322,7 @@ struct PlayerScreen: View {
                         if route.continuesRecommendations {
                             VStack(spacing: 16) {
                                 if let error = feed.error { ErrorNote(message: error) }
-                                ActionButton(title: feed.loading ? "Loading lessons…" : feed.error == nil ? "Load more" : "Try again",
+                                ActionButton(title: feed.loading ? "Loading videos…" : feed.error == nil ? "Load more" : "Try again",
                                              primary: false) {
                                     Task { await feed.load(api: api) }
                                 }
@@ -660,7 +637,11 @@ struct ClipPage: View {
             .onChange(of: playback.isPlaying) { _, playing in
                 if playing, active, visible, !recorded {
                     recorded = clip.playbackURL.isFileURL || quota.recordWatch(clip.id, premium: commerce.premium)
-                    if clip.playbackURL.isFileURL { offline.markOpened(clip.id) }
+                    if clip.playbackURL.isFileURL {
+                        offline.markOpened(clip.id)
+                    } else if recorded, let owner = commerce.api.session?.userId.value {
+                        library.recordWatch(clip, owner: owner)
+                    }
                     if !recorded { playback.pause(); allowed = false }
                 }
                 if playing, active, recorded { didStartPlaying() }

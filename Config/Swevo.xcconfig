@@ -1,15 +1,15 @@
 // Swevo — TEST configuration (toolkit fixed test values, Clipo baseline 0d55c2d).
-// Switch to production only after the user confirms testing passed; see Documentation/CONFIRMATIONS.md.
+// See the Production transition section in README.md for release settings.
 PRODUCT_BUNDLE_IDENTIFIER = im.seex.lobo
 // getV2 `name`; keep the original capitalisation.
 SWEVO_RELEASE_NAME = Swevo
 SWEVO_API_HOST = devapi.io-jp.com
 // Business packageName and guest-login source.
 SWEVO_SERVICE_PACKAGE_NAME = $(PRODUCT_BUNDLE_IDENTIFIER)
-// Empty expansion preserves // in xcconfig URL values. Placeholders until production.
+// Empty expansion preserves // in xcconfig URL values. Replace the website and privacy placeholders before release.
 SWEVO_WEBSITE_URL = https:/$()/example.com/
 SWEVO_PRIVACY_URL = https:/$()/example.com/
-SWEVO_TERMS_URL = https:/$()/example.com/
+SWEVO_TERMS_URL = https:/$()/www.apple.com/legal/internet-services/itunes/dev/stdeula/
 IPHONEOS_DEPLOYMENT_TARGET = 17.0
 SWIFT_VERSION = 5.0
 TARGETED_DEVICE_FAMILY = 1

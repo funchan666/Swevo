@@ -33,11 +33,52 @@ final class LibraryStore: ObservableObject {
     var history: [LessonLinkVisit] { snapshot.history }
     func url(for movie: PracticeRecording) -> URL { root.appendingPathComponent(movie.filename) }
 
+    func watchedVideos(for owner: String?) -> [WatchedVideo] {
+        guard let owner else { return [] }
+        return snapshot.watchedVideos?.filter { $0.owner == owner } ?? []
+    }
+
+    func recordWatch(_ clip: LessonClip, owner: String) {
+        guard !clip.playbackURL.isFileURL else { return }
+        var next = snapshot
+        var history = next.watchedVideos ?? []
+        history.removeAll { $0.owner == owner && $0.id == clip.id }
+        history.insert(WatchedVideo(clip: clip, date: Date(), owner: owner), at: 0)
+        next.watchedVideos = Array(history.prefix(100))
+        save(next)
+    }
+
+    func removeWatch(_ visit: WatchedVideo) {
+        var next = snapshot
+        next.watchedVideos?.removeAll { $0.owner == visit.owner && $0.id == visit.id }
+        save(next)
+    }
+
     func markOpened(_ movie: PracticeRecording) {
         guard let index = snapshot.movies.firstIndex(where: { $0.id == movie.id }) else { return }
         var next = snapshot
         next.movies[index].lastOpenedAt = Date()
         save(next)
+    }
+
+    func addRange(_ range: ClosedRange<Double>, name: String, to movieID: UUID) throws {
+        guard let index = movies.firstIndex(where: { $0.id == movieID && !$0.isAudio }) else { throw SwevoError.storage }
+        let title = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        let mark = VideoRangeMark(id: UUID(), name: title, start: range.lowerBound, end: range.upperBound)
+        guard mark.timeRange != nil else { throw SwevoError.service("Choose a start and end for the range.") }
+        var next = snapshot
+        var ranges = next.movies[index].rangeMarks ?? []
+        guard !ranges.contains(where: { $0.start == mark.start && $0.end == mark.end && $0.name == mark.name }) else { return }
+        ranges.insert(mark, at: 0)
+        next.movies[index].rangeMarks = ranges
+        try persist(next)
+    }
+
+    func removeRange(_ mark: VideoRangeMark, from movieID: UUID) throws {
+        guard let index = movies.firstIndex(where: { $0.id == movieID }) else { throw SwevoError.storage }
+        var next = snapshot
+        next.movies[index].rangeMarks?.removeAll { $0.id == mark.id }
+        try persist(next)
     }
     // Internal IDs stay stable; only the user-facing shared copy gets a readable name.
     func shareFile(for movie: PracticeRecording, commerce: CommerceStore) async throws -> URL {
@@ -93,13 +134,6 @@ final class LibraryStore: ObservableObject {
         else { next.favorites.insert(clip, at: 0) }
         do { try persist(next); return true }
         catch { self.error = "Favorites could not be updated. Please try again."; return false }
-    }
-    func record(link: String, title: String) {
-        var next = snapshot
-        next.history.removeAll { $0.link == link }
-        next.history.insert(LessonLinkVisit(id: UUID(), link: link, title: title, date: Date()), at: 0)
-        next.history = Array(next.history.prefix(100))
-        save(next)
     }
     func clearHistory() {
         var next = snapshot

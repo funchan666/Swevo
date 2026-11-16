@@ -150,6 +150,23 @@ struct LessonLinkVisit: Codable, Identifiable {
     let title: String
     let date: Date
 }
+struct WatchedVideo: Codable, Identifiable {
+    let clip: LessonClip
+    let date: Date
+    let owner: String
+    var id: String { clip.id }
+}
+struct VideoRangeMark: Codable, Identifiable, Hashable {
+    let id: UUID
+    let name: String
+    let start: Double
+    let end: Double
+
+    var timeRange: ClosedRange<Double>? {
+        guard start.isFinite, end.isFinite, start >= 0, end > start else { return nil }
+        return start...end
+    }
+}
 struct PracticeRecording: Codable, Identifiable, Hashable {
     let id: UUID
     let filename: String
@@ -157,6 +174,7 @@ struct PracticeRecording: Codable, Identifiable, Hashable {
     let date: Date
     let isExport: Bool
     var lastOpenedAt: Date? = nil
+    var rangeMarks: [VideoRangeMark]? = nil
 
     var fileExtension: String { (filename as NSString).pathExtension }
     var isAudio: Bool { fileExtension.lowercased() == "m4a" }
@@ -171,6 +189,7 @@ struct LessonLibrarySnapshot: Codable {
     var favorites: [LessonClip] = []
     var history: [LessonLinkVisit] = []
     var movies: [PracticeRecording] = []
+    var watchedVideos: [WatchedVideo]? = nil
 }
 struct ChannelRoute: Identifiable, Hashable {
     let link: String

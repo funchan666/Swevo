@@ -46,6 +46,7 @@ struct ShotPracticeSession: Codable, Identifiable {
     let title: String
     var finishedAt: Date?
     var takes: [ShotTake]
+    var reviewMovieID: UUID? = nil
     var successfulTakes: Int { takes.filter { $0.result.countsAsSuccess }.count }
 }
 
@@ -107,14 +108,21 @@ final class ShotPracticeJournal: ObservableObject {
         commit(next)
     }
 
-    @discardableResult
-    func finishSession() -> Bool {
-        guard var session = activeSession, !session.takes.isEmpty else { return false }
+    func finishSession() -> ShotPracticeSession? {
+        guard var session = activeSession, !session.takes.isEmpty else { return nil }
         session.finishedAt = Date()
         var next = archive
         next.completedSessions.insert(session, at: 0)
         next.activeSession = nil
-        return commit(next)
+        return commit(next) ? session : nil
+    }
+
+    func attachReviewVideo(_ movieID: UUID, to sessionID: UUID) {
+        guard let index = archive.completedSessions.firstIndex(where: { $0.id == sessionID }),
+              archive.completedSessions[index].reviewMovieID != movieID else { return }
+        var next = archive
+        next.completedSessions[index].reviewMovieID = movieID
+        commit(next)
     }
 
     @discardableResult

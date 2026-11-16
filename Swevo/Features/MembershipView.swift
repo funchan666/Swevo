@@ -6,7 +6,6 @@ struct MembershipView: View {
     var exportRequired = false
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .body) private var pairedMinimumWidth: CGFloat = 316
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var commerce: CommerceStore
     @EnvironmentObject private var quota: QuotaStore
@@ -26,7 +25,7 @@ struct MembershipView: View {
     private var plans: [SKProduct] {
         (commerce.policy?.products ?? []).compactMap { entry in
             commerce.products.first { $0.productIdentifier == entry.id }
-        }
+        }.filter { !commerce.period($0, locale: locale).isEmpty }
     }
     private var selectedPlan: SKProduct? {
         plans.first(where: { $0.productIdentifier == selectedID }) ?? plans.first
@@ -35,9 +34,12 @@ struct MembershipView: View {
     private var interactionLocked: Bool { purchasing || commerce.loadingPlans || ads.busy || ads.isPresenting }
 
     var body: some View {
-        ScenePage(artwork: "ScenePlusCover", depth: 140, openingGap: 0, artworkOpacity: 0.58) { _ in
-            SceneTitle("Swevo Plus", size: 42)
-                .padding(.top, 54)
+        ScenePage(artwork: "ScenePlusCover", depth: 172, openingGap: 0, artworkOpacity: 0.92) { _ in
+            VStack(alignment: .leading, spacing: 4) {
+                LocalizedText("Swevo Plus").font(.capture(.largeTitle, weight: .semibold, display: true))
+                    .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+                restoreLink
+            }.padding(.trailing, 48)
         } content: { container in
             membershipContent(in: container)
         }
@@ -75,54 +77,76 @@ struct MembershipView: View {
         let bounds = CGRect(origin: .zero, size: container.size)
         let allowsColumns = !typeSize.isAccessibilitySize && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
         let wide = allowsColumns && width >= 620
-        let paired = allowsColumns && width >= pairedMinimumWidth && !wide
         let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 32))
                           : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
 
         return VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 4) {
-                restoreLink
-                if purchaseAction == .restore { purchaseFeedback }
-            }
+            if purchaseAction == .restore { purchaseFeedback }
+            exportHighlight
             layout {
-                benefits(paired: paired)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(alignment: .leading, spacing: 8) {
-                    if commerce.premium {
-                        activeMembership
-                        renewalDisclosure
-                    } else {
-                        checkout(paired: paired)
-                    }
-                    if purchaseAction == .subscribe { purchaseFeedback }
-                    PolicyLinks(compact: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                checkout.frame(maxWidth: .infinity, alignment: .leading)
+                benefits.frame(maxWidth: .infinity, alignment: .leading)
             }
             if !exportRequired, !commerce.premium, api.session != nil { rewardOption }
         }
     }
 
-    private func benefits(paired: Bool) -> some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .topLeading), count: paired ? 2 : 1)
-        return VStack(alignment: .leading, spacing: 12) {
+    private var checkout: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if commerce.premium {
+                activeMembership
+            } else {
+                planSelection
+            }
+            if commerce.canRetryPurchaseConfirmation {
+                ActionButton(title: "Retry purchase confirmation", primary: false, busy: purchasing) {
+                    purchaseAction = .subscribe
+                    purchaseTask = Task {
+                        await commerce.retryPurchaseConfirmation()
+                        purchaseTask = nil
+                    }
+                }.disabled(interactionLocked)
+                    .accessibilityIdentifier("membership.retryPurchase")
+            } else if !commerce.premium {
+                if let selectedPlan { renewalDisclosure(for: selectedPlan) }
+                if selectedPlan != nil || commerce.loadingPlans || purchasing { subscribeButton }
+            }
+            if purchaseAction == .subscribe || (purchaseAction == nil && commerce.canRetryPurchaseConfirmation) {
+                purchaseFeedback
+            }
+            PolicyLinks(compact: true)
+        }
+    }
+
+    private var exportHighlight: some View {
+        VStack(alignment: .leading, spacing: 10) {
             if exportRequired {
                 LocalizedText("Export is included with Plus.")
-                    .font(.capture(.subheadline, weight: .semibold)).foregroundStyle(SwevoStyle.accent)
+                    .font(.capture(.footnote, weight: .semibold)).foregroundStyle(SwevoStyle.accent)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            HStack(alignment: .top, spacing: 14) {
+                Glyph(symbol: .feed, size: 23, tint: SwevoStyle.ink)
+                    .frame(width: 44, height: 44).background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 4) {
+                    LocalizedText("JPEG stills and comparison images").font(.capture(.title3, weight: .semibold, display: true))
+                    LocalizedText("Share three frames or one image with the range name and timestamps.")
+                        .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                }.fixedSize(horizontal: false, vertical: true)
+            }.frame(maxWidth: .infinity, alignment: .leading).accessibilityElement(children: .combine)
+        }.padding(.bottom, 15).overlay(alignment: .bottom) { Divider().overlay(SwevoStyle.line).accessibilityHidden(true) }
+    }
+
+    private var benefits: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionLabel(title: "Plus benefits").accessibilityAddTraits(.isHeader)
             benefit(.edit, "MP4 video export", "Up to 1080p")
-            benefit(.sound, "M4A audio export", "Extract audio from video.")
+            benefit(.sound, "M4A audio export")
             Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-                benefit(.play, "Unlimited lesson views")
-                benefit(.download, "Unlimited offline downloads")
-                benefit(.home, "Skip opening ads")
-                benefit(.bookmark, "Shot presets")
-            }
+            benefit(.bookmark, "Shot presets", "Save movement, duration and focus settings.")
+            benefit(.play, "No daily viewing or download limits")
+            benefit(.home, "Skip opening ads")
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(LocalizedStringKey("Plus benefits"))
     }
 
     private func benefit(_ symbol: SwevoGlyph, _ title: String, _ detail: String? = nil) -> some View {
@@ -149,6 +173,13 @@ struct MembershipView: View {
                 LocalizedText("Access through %@.", date)
                     .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
             }
+            if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                Link(destination: url) {
+                    LocalizedText("Manage subscription").font(.capture(.footnote, weight: .semibold))
+                        .foregroundStyle(SwevoStyle.accent)
+                        .frame(minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                }.buttonStyle(PressStyle())
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -163,17 +194,17 @@ struct MembershipView: View {
         }
     }
 
-    private func checkout(paired: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var planSelection: some View {
+        let invalidPlans = !commerce.loadingPlans && !commerce.products.isEmpty && plans.isEmpty
+        return VStack(alignment: .leading, spacing: 12) {
+            if !plans.isEmpty { planPicker }
             if api.session == nil { ConnectionPanel() }
-            if !plans.isEmpty { planPicker(paired: paired) }
-            if let error = commerce.plansError {
+            if let error = commerce.plansError ?? (invalidPlans ?
+                "This plan isn’t available from Apple yet. Please try again later." : nil) {
                 ErrorNote(message: error)
                 ActionButton(title: "Retry", primary: false) { Task { await commerce.loadPlans() } }
                     .disabled(interactionLocked)
             }
-            if selectedPlan != nil { renewalDisclosure }
-            if selectedPlan != nil || commerce.loadingPlans || purchasing { subscribeButton }
         }
     }
 
@@ -184,77 +215,63 @@ struct MembershipView: View {
         return "Subscribe"
     }
 
-    private func planPicker(paired: Bool) -> some View {
-        let sideBySide = paired && plans.count == 2
-        let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 4))
-                                : AnyLayout(VStackLayout(spacing: 4))
-        return layout {
+    private var planPicker: some View {
+        VStack(spacing: 0) {
             ForEach(plans, id: \.productIdentifier) { plan in
-                planOption(plan, sideBySide: sideBySide)
+                planOption(plan)
+                if plan.productIdentifier != plans.last?.productIdentifier {
+                    Divider().overlay(SwevoStyle.line).padding(.horizontal, 14).accessibilityHidden(true)
+                }
             }
-        }
-        .padding(4)
-        .swevoGlass(cornerRadius: 18)
+        }.clipShape(.rect(cornerRadius: 16)).swevoGlass(cornerRadius: 16)
     }
 
-    private func planOption(_ product: SKProduct, sideBySide: Bool) -> some View {
+    private func planOption(_ product: SKProduct) -> some View {
         let selected = selectedPlan?.productIdentifier == product.productIdentifier
         let price = commerce.price(product)
         let period = commerce.period(product, locale: locale)
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         return Button { selectedID = product.productIdentifier } label: {
-            Group {
-                if sideBySide {
-                    VStack(alignment: .leading, spacing: 4) {
-                        planName(product, selected: selected)
-                        planPrice(price, selected: selected)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        planName(product)
                         planPeriod(period)
-                    }
-                } else {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                planName(product, selected: selected)
-                                planPeriod(period)
-                            }.fixedSize(horizontal: true, vertical: false)
-                            Spacer(minLength: 0)
-                            planPrice(price, selected: selected).fixedSize(horizontal: true, vertical: false)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            planName(product, selected: selected)
-                            planPrice(price, selected: selected)
-                            planPeriod(period)
-                        }
+                    }.fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    planPrice(price, selected: selected).fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    planName(product)
+                    planPrice(price, selected: selected)
+                    planPeriod(period)
+                }
+            }.padding(.horizontal, 16).padding(.vertical, 13)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .foregroundStyle(SwevoStyle.paper)
+                .background(selected ? SwevoStyle.accent.opacity(0.10) : Color.clear)
+                .overlay(alignment: .leading) {
+                    if selected {
+                        Capsule().fill(SwevoStyle.accent).frame(width: 3).padding(.vertical, 10).allowsHitTesting(false)
                     }
                 }
-            }.padding(.horizontal, 12).padding(.vertical, 10)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
-                .foregroundStyle(SwevoStyle.paper)
-                .background(selected ? SwevoStyle.accent.opacity(0.12) : Color.clear, in: shape)
-                .overlay { shape.strokeBorder(selected ? SwevoStyle.accent.opacity(0.75) : Color.clear).allowsHitTesting(false) }
-                .contentShape(shape)
+                .contentShape(Rectangle())
         }.buttonStyle(PressStyle()).disabled(interactionLocked)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("membership.plan.\(product.productIdentifier)")
     }
 
-    private func planName(_ product: SKProduct, selected: Bool) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .strokeBorder(selected ? SwevoStyle.accent : SwevoStyle.secondary, lineWidth: selected ? 4 : 1)
-                .frame(width: 12, height: 12).accessibilityHidden(true)
-            Group {
-                if let period = product.subscriptionPeriod, period.numberOfUnits == 1, period.unit == .month {
-                    LocalizedText("Monthly")
-                } else if let period = product.subscriptionPeriod, period.numberOfUnits == 1, period.unit == .year {
-                    LocalizedText("Yearly")
-                } else {
-                    Text(verbatim: product.localizedTitle)
-                }
-            }.font(.capture(.subheadline, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    private func planName(_ product: SKProduct) -> some View {
+        Group {
+            if let period = product.subscriptionPeriod, period.numberOfUnits == 1, period.unit == .month {
+                LocalizedText("Monthly")
+            } else if let period = product.subscriptionPeriod, period.numberOfUnits == 1, period.unit == .year {
+                LocalizedText("Yearly")
+            } else {
+                Text(verbatim: product.localizedTitle)
+            }
+        }.font(.capture(.headline, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func planPeriod(_ period: String) -> some View {
@@ -269,8 +286,9 @@ struct MembershipView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var renewalDisclosure: some View {
-        LocalizedText("Renews automatically. Cancel in your Apple account at least 24 hours before renewal.")
+    private func renewalDisclosure(for plan: SKProduct) -> some View {
+        LocalizedText("%@ every %@. Renews automatically until canceled.",
+                      commerce.price(plan), commerce.period(plan, locale: locale))
             .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -282,13 +300,14 @@ struct MembershipView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if purchasing || commerce.loadingPlans {
-                    loadingMark(width: 30, tint: SwevoStyle.ink)
+                    loadingMark(width: 30, tint: SwevoStyle.accent).frame(width: 44, height: 44)
                 } else if selectedPlan != nil {
                     Glyph(symbol: .back, size: 16, tint: SwevoStyle.ink).rotationEffect(.degrees(180))
+                        .frame(width: 44, height: 44).background(SwevoStyle.accent, in: Circle())
                 }
-            }.padding(.horizontal, 16).padding(.vertical, 12).frame(minHeight: 54)
-                .foregroundStyle(SwevoStyle.ink)
-                .background { CaptureSurface(tone: .accent) }
+            }.padding(.leading, 16).padding(.trailing, 7).padding(.vertical, 7).frame(minHeight: 58)
+                .foregroundStyle(SwevoStyle.paper)
+                .swevoGlass(cornerRadius: 29)
                 .contentShape(Rectangle())
         }.buttonStyle(PressStyle())
             .disabled(interactionLocked || selectedPlan == nil)
@@ -390,9 +409,7 @@ struct AccountView: View {
     }
 
     var body: some View {
-        ScenePage(artwork: nil, depth: 48, openingGap: 0) { _ in
-            SceneTitle("Account", size: 38)
-        } content: { container in
+        ScenePage { container in
             accountContent(in: container)
         }
         .sheet(isPresented: $paywall) { MembershipView() }
@@ -407,13 +424,11 @@ struct AccountView: View {
 
         return VStack(alignment: .leading, spacing: 24) {
             layout {
-                Group {
+                VStack(alignment: .leading, spacing: 12) {
+                    membershipEntry
                     if api.session != nil {
-                        VStack(alignment: .leading, spacing: 12) {
-                            accountDetails
-                            membershipEntry
-                            allowance
-                        }
+                        allowance
+                        accountDetails
                     } else { ConnectionPanel() }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .leading, spacing: 12) {
@@ -428,20 +443,19 @@ struct AccountView: View {
 
     @ViewBuilder private var accountDetails: some View {
         if let id = api.session?.userId.value {
-            VStack(alignment: .leading, spacing: 4) {
-                SectionLabel(title: "Account details").accessibilityAddTraits(.isHeader)
-                LocalizedText("ID · %@", id).monospacedDigit().textSelection(.enabled)
-                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-            }.fixedSize(horizontal: false, vertical: true)
+            LocalizedText("ID · %@", id).monospacedDigit().textSelection(.enabled)
+                .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var membershipEntry: some View {
-        Button { paywall = true } label: {
+        let status = api.session == nil ? "Swevo Plus" : (commerce.premium ? "Plus active" : "Free plan")
+        return Button { paywall = true } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    LocalizedText(commerce.premium ? "Plus active" : "Free plan")
+                    LocalizedText(status)
                         .font(.capture(.footnote, weight: .semibold))
                     LocalizedText(commerce.premium ? "View membership" : "View Plus plans")
                         .font(.capture(.headline))
@@ -503,7 +517,7 @@ struct AccountView: View {
     }
 
     private var allowanceTitle: some View {
-        LocalizedText("Today’s lesson limits").font(.capture(.title3, weight: .semibold))
+        LocalizedText("Today’s video allowance").font(.capture(.title3, weight: .semibold))
             .accessibilityAddTraits(.isHeader)
     }
 

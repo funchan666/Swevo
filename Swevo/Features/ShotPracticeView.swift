@@ -12,6 +12,7 @@ struct ShotPracticeView: View {
     @State private var lockedFocus: Bool
     @State private var history = false
     @State private var selectedSession: ShotPracticeSession?
+    @State private var preparingReviewVideo = false
     @State private var showingRemoval = false
     @State private var sharedExport: SharedFile?
     private var emptyHistory: Bool {
@@ -27,9 +28,7 @@ struct ShotPracticeView: View {
     var body: some View {
         let practiceDepth: CGFloat = journal.activeSession == nil ? 116 : 84
         ScenePage(artwork: emptyHistory ? "EmptySessions" : "SceneJournal",
-                  depth: emptyHistory ? 128 : practiceDepth, openingGap: 0, artworkOpacity: 0.45) { _ in
-            SceneTitle(emptyHistory ? "No finished sessions" : "Shot log", size: 34).padding(.trailing, 50)
-        } content: { _ in
+                  depth: emptyHistory ? 128 : practiceDepth, artworkOpacity: 0.45) { _ in
             VStack(alignment: .leading, spacing: 18) {
                 ChoiceStrip(values: ["Practice", "Sessions"], selected: history ? "Sessions" : "Practice") {
                     history = $0 == "Sessions"
@@ -77,24 +76,35 @@ struct ShotPracticeView: View {
             TextField("Take note (optional)", text: $note, axis: .vertical)
                 .lineLimit(2...5).swevoField()
             LocalizedText("Take result").font(.capture(.headline))
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), spacing: 10)], spacing: 10) {
+            VStack(spacing: 0) {
                 ForEach(ShotResult.allCases) { result in
-                    ActionButton(title: result.label, primary: result.countsAsSuccess) {
+                    Button {
                         if journal.record(result, movement: movement, seconds: seconds, lockedFocus: lockedFocus, note: note) {
                             note = ""
                         }
-                    }
+                    } label: {
+                        HStack(spacing: 10) {
+                            LocalizedText(result.label).font(.capture(.subheadline, weight: .semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            if result.countsAsSuccess {
+                                Glyph(symbol: .bookmark, size: 17, tint: SwevoStyle.accent)
+                            }
+                        }.padding(.horizontal, 14).padding(.vertical, 6)
+                            .frame(minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(PressStyle())
+                    if result != .lostFocus { Divider().overlay(SwevoStyle.line).accessibilityHidden(true) }
                 }
-            }
+            }.swevoGlass(cornerRadius: 16)
             countSummary(session)
             if let last = session.takes.last { takeRow(last) }
             Button { journal.undoLastTake() } label: { LocalizedText("Undo last take") }
                 .buttonStyle(CompactActionStyle()).disabled(session.takes.isEmpty)
             ActionButton(title: "Finish session", primary: false) {
-                if journal.finishSession() {
-                    note = ""
-                    history = true
-                }
+                guard let finished = journal.finishSession() else { return }
+                note = ""
+                history = true
+                selectedSession = finished
             }.disabled(session.takes.isEmpty)
         }
     }
@@ -111,7 +121,7 @@ struct ShotPracticeView: View {
     @ViewBuilder private var sessions: some View {
         if emptyHistory {
             VStack(alignment: .leading, spacing: 14) {
-                EmptyStateCopy(message: "Finish a practice session to review its takes here.")
+                EmptyStateCopy(title: "No finished sessions", message: "Finish a practice session to review its takes here.")
                 EmptyStateAction(title: "Back to practice", symbol: .edit) { history = false }
             }
         }
@@ -132,20 +142,23 @@ struct ShotPracticeView: View {
     private func sessionDetail(_ session: ShotPracticeSession) -> some View {
         VStack(spacing: 0) {
             SheetHeading(title: "Session results") { selectedSession = nil }
+                .disabled(preparingReviewVideo)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     sessionTitle(session).font(.capture(.title2, display: true))
                     countSummary(session)
-                    ForEach(session.takes) { take in takeRow(take) }
+                    ShotPracticeReview(journal: journal, sessionID: session.id, busy: $preparingReviewVideo)
                     if let message = journal.storageMessage { ErrorNote(message: message) }
+                    ForEach(session.takes) { take in takeRow(take) }
                     ActionButton(title: "Export session CSV", primary: false) {
                         if let url = journal.exportSession(session) { sharedExport = SharedFile(url: url) }
-                    }
+                    }.disabled(preparingReviewVideo)
                     Button { showingRemoval = true } label: { LocalizedText("Delete session") }
-                        .buttonStyle(CompactActionStyle())
+                        .buttonStyle(CompactActionStyle()).disabled(preparingReviewVideo)
                 }.swevoPage()
             }
         }.swevoScreenBackground()
+            .interactiveDismissDisabled(preparingReviewVideo)
             .sheet(item: $sharedExport) { ShareSheet(items: [$0.url]) }
             .fullScreenCover(isPresented: $showingRemoval) {
                 AccountDecisionDialog(title: "Delete session?", message: "This removes the session and its take notes.",
@@ -181,5 +194,45 @@ struct ShotPracticeView: View {
             if !take.note.isEmpty { Text(verbatim: take.note).font(.capture(.subheadline)) }
         }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
             .background { CaptureSurface(tone: .plum) }
+    }
+}
+
+@MainActor
+private struct ShotPracticeReview: View {
+    @EnvironmentObject private var library: LibraryStore
+    @ObservedObject var journal: ShotPracticeJournal
+    let sessionID: UUID
+    @Binding var busy: Bool
+    @State private var movieToReview: PracticeRecording?
+
+    private var reviewMovie: PracticeRecording? {
+        guard let movieID = journal.completedSessions.first(where: { $0.id == sessionID })?.reviewMovieID else { return nil }
+        return library.importedMovies.first { $0.id == movieID }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(title: "Review your footage").accessibilityAddTraits(.isHeader)
+            if let reviewMovie {
+                let url = library.url(for: reviewMovie)
+                let marks = (reviewMovie.rangeMarks ?? []).filter { $0.timeRange != nil }
+                VideoFileButton(url: url, filename: reviewMovie.displayFilename, date: reviewMovie.date, featured: true) {
+                    movieToReview = reviewMovie
+                }.disabled(busy).accessibilityIdentifier("practice.review.openVideo")
+                if !marks.isEmpty {
+                    RangeShareActions(context: .practice(source: url, marks: marks), busy: $busy)
+                }
+            } else {
+                LocalizedText("Mark a range to loop it and compare frames.")
+                    .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                VideoImportActions(onImported: { movieToReview = $0 }, importing: $busy, presentation: .prominent)
+            }
+        }
+        .sheet(item: $movieToReview) { movie in
+            EditorSheet(initialMovie: movie, initialTool: .ranges, onVideoOpened: { opened in
+                journal.attachReviewVideo(opened.id, to: sessionID)
+            })
+        }
     }
 }

@@ -236,7 +236,7 @@ final class APIClient: ObservableObject {
     func resolve(_ link: String, password: String) async throws -> LandingInfo {
         try await perform("/app-api/flow/land-page/info_by_links", query: [
             "externalLinks": link, "password": password, "packageName": configuration.servicePackageName],
-            missingDataMessage: "No content was returned for this link. Check the code, including uppercase and lowercase letters, or try again later.")
+            missingDataMessage: "No video was returned. Check the link and try again later.")
     }
     func channelPage(link: String, page: Int) async throws -> ChannelPage {
         try await perform("/app-api/flow/land-page/list_by_links_page", query: [

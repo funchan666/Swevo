@@ -7,7 +7,7 @@ struct LibraryView: View {
     @EnvironmentObject private var commerce: CommerceStore
     @State private var showingExportMembership = false
     var edit: (PracticeRecording) -> Void
-    var watchTutorials: () -> Void
+    var browseVideos: () -> Void
     var openEditor: () -> Void
     @Binding var filter: String
     @Binding var importing: Bool
@@ -26,15 +26,15 @@ struct LibraryView: View {
 
     private enum Category: String, CaseIterable, Identifiable {
         case imports = "Imports"
+        case offline = "Downloads"
         case exports = "Exports"
         case saved = "Saved"
-        case offline = "Downloads"
 
         var id: String { rawValue }
         var title: String {
             switch self {
             case .saved: "Favorites"
-            case .offline: "Offline videos"
+            case .offline: "Offline"
             case .imports, .exports: rawValue
             }
         }
@@ -50,7 +50,7 @@ struct LibraryView: View {
             switch self {
             case .saved: "EmptyFavorites"
             case .offline: "EmptyOffline"
-            case .imports: "EmptyImports"
+            case .imports: "SceneArchive"
             case .exports: "EmptyExports"
             }
         }
@@ -58,19 +58,19 @@ struct LibraryView: View {
             switch self {
             case .saved: "No favorites yet"
             case .offline: "No offline videos yet"
-            case .imports: "No imported videos yet"
+            case .imports: "Import a video"
             case .exports: "No exports yet"
             }
         }
         var emptyMessage: String {
             switch self {
-            case .saved: "Tap Save while watching a lesson to add it here."
-            case .offline: "Tap Download while watching a lesson to save it for offline viewing."
+            case .saved: "Save a video while watching to find it here."
+            case .offline: "Download a video to watch it without a connection."
             case .imports: "Swevo makes a copy for editing."
             case .exports: "Videos and audio you export from the editor appear here."
             }
         }
-        var opensTutorials: Bool { self == .saved || self == .offline }
+        var opensOnlineVideos: Bool { self == .saved || self == .offline }
     }
 
     private var showsEmptyState: Bool {
@@ -82,20 +82,19 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        ScenePage(artwork: nil, depth: 48, openingGap: 0) { _ in
-            SceneTitle("Files", size: 38)
-        } content: { container in
+        ScenePage { container in
             let width = SwevoStyle.pageContentWidth(in: container)
             let bounds = CGRect(origin: .zero, size: container.size)
             let showsSidebar = width >= 560 && !typeSize.isAccessibilitySize
                 && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
             let layout = showsSidebar
                 ? AnyLayout(HStackLayout(alignment: .top, spacing: 26))
-                : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
             layout {
-                archiveIndex(singleColumn: showsSidebar || typeSize.isAccessibilitySize || width < 290)
-                    .frame(maxWidth: showsSidebar ? 186 : .infinity, alignment: .leading)
-                librarySection
+                archiveIndex(vertical: showsSidebar || typeSize.isAccessibilitySize)
+                    .frame(maxWidth: showsSidebar ? 176 : .infinity, alignment: .leading)
+                librarySection(artworkWidth: showsSidebar ? nil : container.size.width,
+                               artworkHeight: min(224, max(128, container.size.height * 0.34)))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }.sheet(item: $sharing) { ShareSheet(items: [$0.url]) }
@@ -129,44 +128,77 @@ struct LibraryView: View {
             }
     }
 
-    private func archiveIndex(singleColumn: Bool) -> some View {
-        let columns = singleColumn ? 1 : 2
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: columns), spacing: 8) {
-            ForEach(Category.allCases) { entry in
-                archiveTab(entry)
+    private func archiveIndex(vertical: Bool) -> some View {
+        Group {
+            if vertical {
+                VStack(spacing: 0) {
+                    ForEach(Category.allCases) { entry in archiveTab(entry, vertical: true) }
+                }
+            } else {
+                ScrollViewReader { scroll in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 4) {
+                            ForEach(Category.allCases) { entry in
+                                archiveTab(entry, vertical: false).id(entry.id)
+                            }
+                        }
+                    }
+                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    .onChange(of: category, initial: true) { _, entry in
+                        scroll.scrollTo(entry.id, anchor: .center)
+                    }
+                }
             }
+        }
+        .background(alignment: vertical ? .leading : .bottom) {
+            Rectangle().fill(SwevoStyle.line)
+                .frame(width: vertical ? 1 : nil, height: vertical ? nil : 1)
+                .allowsHitTesting(false).accessibilityHidden(true)
         }
     }
 
-    private func archiveTab(_ entry: Category) -> some View {
+    private func archiveTab(_ entry: Category, vertical: Bool) -> some View {
         let selected = category == entry
+        let total = count(in: entry)
         return Button { filter = entry.rawValue } label: {
-            HStack(alignment: .center, spacing: 8) {
-                Glyph(symbol: entry.glyph, size: 16, tint: selected ? SwevoStyle.ink : SwevoStyle.secondary)
+            HStack(spacing: 6) {
+                if vertical {
+                    Glyph(symbol: entry.glyph, size: 15, tint: selected ? SwevoStyle.accent : SwevoStyle.secondary)
+                }
                 LocalizedText(entry.title)
-                    .font(.capture(.footnote, weight: .semibold))
+                    .font(.capture(.subheadline, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                Text(count(in: entry), format: .number)
-                    .font(.capture(.footnote, weight: .semibold)).monospacedDigit()
-                    .foregroundStyle(selected ? SwevoStyle.ink : SwevoStyle.secondary)
-            }.padding(.horizontal, 11).padding(.vertical, 8)
-                .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
-                .foregroundStyle(selected ? SwevoStyle.ink : SwevoStyle.paper)
-                .background(selected ? SwevoStyle.accent : SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 11))
-                .contentShape(Rectangle())
+                if vertical { Spacer(minLength: 0) }
+                if total > 0 {
+                    Text(total, format: .number)
+                        .font(.capture(.caption)).monospacedDigit()
+                        .foregroundStyle(SwevoStyle.secondary)
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .frame(minWidth: 44, maxWidth: vertical ? .infinity : nil, minHeight: 48,
+                   alignment: vertical ? .leading : .center)
+            .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
+            .overlay(alignment: vertical ? .leading : .bottom) {
+                if selected {
+                    Rectangle().fill(SwevoStyle.accent)
+                        .frame(width: vertical ? 2 : nil, height: vertical ? nil : 2)
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
         }.buttonStyle(PressStyle())
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private var librarySection: some View {
+    private func librarySection(artworkWidth: CGFloat?, artworkHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if showsEmptyState {
-                emptyContent
+                emptyContent(artworkWidth: artworkWidth, artworkHeight: artworkHeight)
             }
             if category == .imports {
-                VideoImportActions(onImported: edit, importing: $importing)
+                VideoImportActions(onImported: edit, importing: $importing, presentation: .library)
                     .padding(.bottom, 4)
             }
             if category == .offline {
@@ -190,23 +222,23 @@ struct LibraryView: View {
         }
     }
 
-    private var emptyContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SceneArtwork(name: category.emptyArtwork)
-                .frame(height: 84)
-                .opacity(0.55)
-            LocalizedText(category.emptyTitle)
-                .font(.capture(.title3, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+    private func emptyContent(artworkWidth: CGFloat?, artworkHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SceneTitle(category.emptyTitle, size: 34)
             EmptyStateCopy(message: category.emptyMessage)
-            if category.opensTutorials {
-                EmptyStateAction(title: "Watch tutorials", symbol: .play, action: watchTutorials)
+            if category.opensOnlineVideos {
+                EmptyStateAction(title: "Browse videos", symbol: .play, action: browseVideos)
             } else if category == .exports {
                 EmptyStateAction(title: "Open editor", symbol: .edit, action: openEditor)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, artworkHeight * 0.8)
+        .background(alignment: .top) {
+            SceneArtwork(name: category.emptyArtwork)
+                .frame(width: artworkWidth, height: artworkHeight)
+                .opacity(0.94)
+        }
     }
 
     private func count(in entry: Category) -> Int {

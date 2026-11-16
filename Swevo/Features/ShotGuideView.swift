@@ -77,7 +77,6 @@ struct ShotGuideView: View {
         NavigationStack {
             ScenePage(artwork: notes.first?.artwork, depth: 210, openingGap: 0, artworkOpacity: 0.68) { _ in
                 VStack(alignment: .leading, spacing: 8) {
-                    SceneTitle("Shot field notes", size: 34)
                     if let first = notes.first {
                         NavigationLink(value: first.id) {
                             HStack(spacing: 10) {
@@ -135,7 +134,8 @@ private struct ShotNoteReader: View {
             VStack(alignment: .leading, spacing: 8) {
                 LocalizedText(note.category).font(.capture(.subheadline, weight: .semibold))
                     .foregroundStyle(SwevoStyle.accent)
-                SceneTitle(note.title, size: 34)
+                LocalizedText(note.title).font(.capture(.title2, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
             }.padding(.leading, 50)
         } content: { _ in
             VStack(alignment: .leading, spacing: 26) {

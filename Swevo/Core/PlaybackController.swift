@@ -18,6 +18,7 @@ final class PlaybackController: ObservableObject {
     let timeline = PlaybackTimeline()
     @Published var muted = false
     @Published var speed: Float = 1
+    @Published private(set) var repeatedRange: ClosedRange<Double>?
     private(set) var loadedURL: URL?
     var intendsPlayback: Bool { wantsPlayback }
     private var status: NSKeyValueObservation?
@@ -85,7 +86,11 @@ final class PlaybackController: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token else { return }
                 // Seek completion resumes only if this page still intends to play.
-                self.seek(0)
+                if let range = self.repeatedRange {
+                    if self.wantsPlayback, !self.seeking { self.seek(range.lowerBound) }
+                } else {
+                    self.seek(0)
+                }
             }
         }
         failureObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] notification in
@@ -147,8 +152,26 @@ final class PlaybackController: ObservableObject {
         speed = value
         if wantsPlayback { play() }
     }
+    func playRepeating(_ range: ClosedRange<Double>) {
+        guard let item = player.currentItem else { return }
+        pause()
+        repeatedRange = range
+        item.forwardPlaybackEndTime = CMTime(seconds: range.upperBound, preferredTimescale: 600)
+        seek(range.lowerBound)
+        play()
+    }
+
+    func stopRepeating() {
+        guard repeatedRange != nil else { return }
+        repeatedRange = nil
+        player.currentItem?.forwardPlaybackEndTime = .invalid
+    }
+
     func seek(_ seconds: Double) {
         guard seconds.isFinite, player.currentItem != nil else { return }
+        if let range = repeatedRange, seconds < range.lowerBound || seconds >= range.upperBound {
+            stopRepeating()
+        }
         let length = player.currentItem?.duration.seconds ?? 0
         pendingSeek = max(0, length.isFinite && length > 0 ? min(seconds, length) : seconds)
         player.pause()
@@ -215,12 +238,14 @@ final class PlaybackController: ObservableObject {
     }
     private func fail(_ message: String) {
         pause()
+        stopRepeating()
         error = message
         isLoading = false
     }
     func release() {
         generation = UUID()
         pause()
+        stopRepeating()
         status = nil
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
@@ -378,8 +403,14 @@ final class PlayerLayerView: UIView {
     override class var layerClass: AnyClass { AVPlayerLayer.self }
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 }
-func durationLabel(_ seconds: Double) -> String {
+func durationLabel(_ seconds: Double, fractional: Bool = false) -> String {
     let safe = seconds.isFinite ? max(0, seconds) : 0
-    let number = Int(min(safe, 359999))
+    let bounded = min(safe, 359999)
+    if fractional {
+        let ticks = Int((bounded * 100).rounded())
+        let number = ticks / 100
+        return String(format: "%d:%02d.%02d", number / 60, number % 60, ticks % 100)
+    }
+    let number = Int(bounded)
     return String(format: "%d:%02d", number / 60, number % 60)
 }

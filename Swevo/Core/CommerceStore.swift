@@ -29,6 +29,7 @@ final class CommerceStore: NSObject, ObservableObject {
     @Published private(set) var rightsVerified = false
     @Published private(set) var expiration: Date?
     @Published private(set) var busy = false
+    @Published private var purchaseAccessNeedsRefresh = false
     @Published private(set) var loadingProducts = false
     @Published private(set) var preparingPurchase = false
     @Published private(set) var loadingPlans = false
@@ -49,16 +50,25 @@ final class CommerceStore: NSObject, ObservableObject {
     private var receiptContinuation: CheckedContinuation<Void, Error>?
     private var processing: Set<String> = []
     private var processingFailures: Set<String> = []
+    private var restoring = false
     private var ownerID: String?
     private var refreshID = UUID()
     private var refreshTask: Task<Void, Never>?
     private var refreshingOwner: String?
-    var premium: Bool { expiration.map { $0 > Date() } ?? false }
+    var premium: Bool {
+        guard let ownerID, ownerID == api.session?.userId.value else { return false }
+        return expiration.map { $0 > Date() } ?? false
+    }
     private var verifiedCurrentAccount: Bool {
         rightsVerified && ownerID != nil && ownerID == api.session?.userId.value
     }
     var hasVerifiedPlus: Bool { verifiedCurrentAccount && premium }
     var canExportMedia: Bool { hasVerifiedPlus }
+    var canRetryPurchaseConfirmation: Bool {
+        purchaseAccessNeedsRefresh || SKPaymentQueue.default().transactions.contains {
+            $0.transactionState == .purchased || $0.transactionState == .restored
+        }
+    }
     func requireMediaExport() throws {
         guard verifiedCurrentAccount else {
             throw SwevoError.service("Connect to verify your Plus membership before exporting.")
@@ -79,9 +89,9 @@ final class CommerceStore: NSObject, ObservableObject {
         }
         SKPaymentQueue.default().add(self)
     }
-    func refresh() async {
+    func refresh(force: Bool = false) async {
         let owner = api.session?.userId.value
-        if let refreshTask, refreshingOwner == owner {
+        if !force, let refreshTask, refreshingOwner == owner {
             await refreshTask.value
             return
         }
@@ -98,7 +108,14 @@ final class CommerceStore: NSObject, ObservableObject {
         guard refreshID == id, !Task.isCancelled else { return }
         rightsVerified = false
         let userID = api.session?.userId.value
-        if ownerID != userID { expiration = nil; release = nil; releaseConfigurationError = nil; ownerID = userID }
+        if ownerID != userID {
+            expiration = nil
+            release = nil
+            releaseConfigurationError = nil
+            purchaseAccessNeedsRefresh = false
+            message = nil
+            ownerID = userID
+        }
         quota.configure(userID: userID, policy: policy, remote: release?.quotaConfig)
         guard userID != nil else { return }
         error = nil
@@ -124,6 +141,11 @@ final class CommerceStore: NSObject, ObservableObject {
             guard refreshID == id, api.session?.userId.value == userID else { return }
             expiration = rights.expiration
             rightsVerified = true
+            if purchaseAccessNeedsRefresh, hasVerifiedPlus {
+                purchaseAccessNeedsRefresh = false
+                error = nil
+                message = "Purchase confirmed. Membership has been refreshed."
+            }
         } catch { if refreshID == id, self.error == nil { self.error = error.localizedDescription } }
         retryPending()
     }
@@ -302,18 +324,34 @@ final class CommerceStore: NSObject, ObservableObject {
         guard !busy, !preparingPurchase, !loadingPlans else { return }
         guard api.session != nil, ledgerAvailable else { error = "Your connection or purchase records are not ready. Please try again shortly."; return }
         busy = true
+        restoring = true
         error = nil
         message = "Checking your Apple purchases…"
         SKPaymentQueue.default().restoreCompletedTransactions()
     }
-    func retryPending() {
-        guard ledgerAvailable else { return }
+    func retryPurchaseConfirmation() async {
+        guard !busy, !preparingPurchase, !loadingPlans else { return }
+        message = nil
+        await refresh(force: true)
+        if purchaseAccessNeedsRefresh, !hasVerifiedPlus {
+            error = "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected."
+        }
+    }
+    func retryPending(includeRestores: Bool = true) {
+        guard ledgerAvailable, !restoring else { return }
         for record in records where record.failure != nil {
             Task { await reportFailure(recordID: record.id) }
         }
-        for transaction in SKPaymentQueue.default().transactions where transaction.transactionState == .purchased || transaction.transactionState == .restored {
+        for transaction in SKPaymentQueue.default().transactions where transaction.transactionState == .purchased
+            || (includeRestores && transaction.transactionState == .restored) {
             Task { await confirm(transaction) }
         }
+    }
+
+    private func finishRestore() {
+        restoring = false
+        busy = false
+        retryPending(includeRestores: false)
     }
     // A durable outbox allows cancellation/error reporting to retry after network loss
     // or a relaunch, without retaining a failed StoreKit transaction in the queue.
@@ -340,51 +378,66 @@ final class CommerceStore: NSObject, ObservableObject {
             self.error = "Purchase status is waiting to sync. Please try again when connected."
         }
     }
-    private func confirm(_ transaction: SKPaymentTransaction) async {
-        guard ledgerAvailable, let transactionID = transaction.transactionIdentifier, !processing.contains(transactionID) else { return }
+    @discardableResult
+    private func confirm(_ transaction: SKPaymentTransaction, refreshAccess: Bool = true) async -> Bool {
+        guard ledgerAvailable, (!restoring || !refreshAccess), let transactionID = transaction.transactionIdentifier,
+              !processing.contains(transactionID) else { return false }
         processing.insert(transactionID)
-        defer { processing.remove(transactionID); busy = false }
+        busy = true
+        defer {
+            processing.remove(transactionID)
+            if !restoring, processing.isEmpty { busy = false }
+        }
         let binding = transaction.payment.applicationUsername ?? transaction.original?.payment.applicationUsername
         let original = transaction.original?.transactionIdentifier ?? transactionID
         guard let index = records.firstIndex(where: {
             $0.id == binding || $0.transactionIDs.contains(transactionID) || $0.originalTransactionID == original
         }), records[index].productID == transaction.payment.productIdentifier else {
-            error = "An Apple purchase is awaiting account reconciliation. Its original order could not be identified; it has not been discarded."
-            return
+            error = "Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access."
+            return false
         }
-        if records[index].confirmedIDs.contains(transactionID) {
-            SKPaymentQueue.default().finishTransaction(transaction)
-            return
+        let record = records[index]
+        if !record.confirmedIDs.contains(transactionID) {
+            do {
+                guard record.apiHost == api.configuration.apiBaseURL?.absoluteString else { throw SwevoError.configuration }
+                var next = records
+                next[index].originalTransactionID = original
+                next[index].transactionIDs.insert(transactionID)
+                try save(next)
+                if Bundle.main.appStoreReceiptURL.flatMap({ try? Data(contentsOf: $0) })?.isEmpty != false {
+                    try await refreshReceipt()
+                }
+                guard let receiptURL = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: receiptURL), !receipt.isEmpty else {
+                    throw SwevoError.service("Apple’s receipt is unavailable. Retry confirmation when connected.")
+                }
+                // Keep server verification bound to the account that placed the order.
+                let owner = api.session?.userId.value == record.owner.userId.value ? (api.session ?? record.owner) : record.owner
+                let body: [String: Any] = ["verificationData": receipt.base64EncodedString(), "purchaseID": record.orderID,
+                    "status": "purchased", "transactionId": transactionID]
+                    .merging(record.billing.verificationFields) { _, value in value }
+                _ = try await api.paymentRequest(path: "/app-api/flow/rights-order/buySuccess", body: body, owner: owner)
+                var confirmed = records
+                confirmed[index].confirmedIDs.insert(transactionID)
+                try save(confirmed) // Keychain write and read-back must precede finishTransaction.
+            } catch {
+                self.error = "Purchase is pending confirmation. \(error.localizedDescription)"
+                return false
+            }
         }
-        do {
-            var next = records
-            next[index].originalTransactionID = original
-            next[index].transactionIDs.insert(transactionID)
-            try save(next)
-            let record = records[index]
-            guard record.apiHost == api.configuration.apiBaseURL?.absoluteString else { throw SwevoError.configuration }
-            if Bundle.main.appStoreReceiptURL.flatMap({ try? Data(contentsOf: $0) })?.isEmpty != false {
-                try await refreshReceipt()
+        let isPurchase = transaction.transactionState == .purchased
+        SKPaymentQueue.default().finishTransaction(transaction)
+        guard api.session?.userId.value == record.owner.userId.value else {
+            error = "This purchase is linked to another Swevo account. Contact support for help restoring access."
+            return false
+        }
+        if refreshAccess {
+            if isPurchase { purchaseAccessNeedsRefresh = true }
+            await refresh(force: true)
+            if isPurchase, purchaseAccessNeedsRefresh {
+                error = "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected."
             }
-            guard let receiptURL = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: receiptURL), !receipt.isEmpty else {
-                throw SwevoError.service("Apple’s receipt is unavailable. Retry confirmation when connected.")
-            }
-            // A refreshed credential is accepted only for the same original user.
-            let owner = api.session?.userId.value == record.owner.userId.value ? (api.session ?? record.owner) : record.owner
-            let body: [String: Any] = ["verificationData": receipt.base64EncodedString(), "purchaseID": record.orderID,
-                "status": "purchased", "transactionId": transactionID]
-                .merging(record.billing.verificationFields) { _, value in value }
-            _ = try await api.paymentRequest(path: "/app-api/flow/rights-order/buySuccess", body: body, owner: owner)
-            var confirmed = records
-            confirmed[index].confirmedIDs.insert(transactionID)
-            try save(confirmed) // Keychain write and read-back must precede finishTransaction.
-            SKPaymentQueue.default().finishTransaction(transaction)
-            if api.session?.userId.value == record.owner.userId.value {
-                let rights = try await api.rights()
-                if api.session?.userId.value == record.owner.userId.value { expiration = rights.expiration }
-            }
-            message = "Purchase confirmed. Membership has been refreshed."
-        } catch { self.error = "Purchase is pending confirmation. \(error.localizedDescription)" }
+        }
+        return true
     }
     private func refreshReceipt() async throws {
         guard receiptRequest == nil else { throw SwevoError.service("Receipt refresh is already in progress. Please retry shortly.") }
@@ -407,7 +460,11 @@ extension CommerceStore: SKProductsRequestDelegate, SKRequestDelegate, SKPayment
     nonisolated func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
         Task { @MainActor in
             guard request === productsRequest else { return }
-            guard let product = response.products.first(where: { $0.productIdentifier == requestedProductID }), product.subscriptionPeriod.map({ $0.numberOfUnits > 0 }) == true else {
+            guard let id = requestedProductID,
+                  let expected = policy?.products.first(where: { $0.id == id })?.period,
+                  let product = response.products.first(where: { $0.productIdentifier == id }),
+                  let period = product.subscriptionPeriod, period.numberOfUnits == 1,
+                  period.unit == (expected == .month ? .month : .year) else {
                 finishProductRequest(request, result: .failure(SwevoError.service("This plan isn’t available from Apple yet. Please try again later.")))
                 return
             }
@@ -438,9 +495,10 @@ extension CommerceStore: SKProductsRequestDelegate, SKRequestDelegate, SKPayment
         Task { @MainActor in
             for transaction in transactions {
                 switch transaction.transactionState {
-                case .purchased, .restored: await confirm(transaction)
+                case .purchased, .restored:
+                    if !restoring { await confirm(transaction) }
                 case .failed:
-                    busy = false
+                    if !restoring, processing.isEmpty { busy = false }
                     guard let index = records.firstIndex(where: { $0.id == transaction.payment.applicationUsername }) else {
                         self.error = "An Apple purchase is awaiting account reconciliation. Its original order could not be identified; it has not been discarded."
                         continue
@@ -458,7 +516,11 @@ extension CommerceStore: SKProductsRequestDelegate, SKRequestDelegate, SKPayment
                     queue.finishTransaction(transaction)
                     let recordID = next[index].id
                     Task { await reportFailure(recordID: recordID) }
-                case .deferred: busy = false; message = "Your purchase is waiting for approval."
+                case .deferred:
+                    if !restoring, processing.isEmpty {
+                        busy = false
+                        message = "Your purchase is waiting for approval."
+                    }
                 case .purchasing: busy = true
                 @unknown default: break
                 }
@@ -467,15 +529,32 @@ extension CommerceStore: SKProductsRequestDelegate, SKRequestDelegate, SKPayment
     }
     nonisolated func paymentQueueRestoreCompletedTransactionsFinished(_ queue: SKPaymentQueue) {
         Task { @MainActor in
-            busy = false
-            if queue.transactions.isEmpty { message = "Apple has no pending purchases to restore." }
-            else if message == "Checking your Apple purchases…" { message = nil }
-            await refresh()
+            guard restoring else { return }
+            defer { finishRestore() }
+            let owner = api.session?.userId.value
+            let recovered = queue.transactions.filter { $0.transactionState == .restored }
+            var verified = true
+            for transaction in recovered {
+                if !(await confirm(transaction, refreshAccess: false)) { verified = false }
+            }
+            let recoveryError = error
+            await refresh(force: true)
+            if !verified {
+                message = nil
+                error = recoveryError ?? "Some purchases couldn’t be restored. Try again."
+            } else if !verifiedCurrentAccount || owner != api.session?.userId.value {
+                message = nil
+                error = "Couldn’t verify Plus access. Try again when connected."
+            } else {
+                message = hasVerifiedPlus ? "Plus active" : "No active Plus access on this account."
+                error = nil
+            }
         }
     }
     nonisolated func paymentQueue(_ queue: SKPaymentQueue, restoreCompletedTransactionsFailedWithError error: Error) {
         Task { @MainActor in
-            busy = false
+            guard restoring else { return }
+            defer { finishRestore() }
             message = nil
             if (error as? SKError)?.code == .paymentCancelled {
                 self.error = nil

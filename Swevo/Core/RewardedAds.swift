@@ -17,7 +17,7 @@ final class RewardedAds: NSObject, ObservableObject, FullScreenContentDelegate {
     private var startupStarted = false
     @Published private(set) var isPreparingAppOpen = false
     private var appOpenTask: Task<Void, Never>?
-    private var appOpenPreloadTask: Task<AppOpenAd, Error>?
+    private var appOpenPreloadTask: Task<Void, Error>?
     private var preloadUnitID: String?
     private var preloadRequestID: UUID?
     private var preparedAppOpen: AppOpenAd?
@@ -182,13 +182,16 @@ final class RewardedAds: NSObject, ObservableObject, FullScreenContentDelegate {
         }
     }
 
-    private func preloadAppOpen(unitID: String) async throws -> AppOpenAd {
-        if preparedUnitID == unitID, let ad = preparedAppOpen, let date = preparedAppOpenDate,
+    private func preloadAppOpen(unitID: String) async throws {
+        if preparedUnitID == unitID, preparedAppOpen != nil, let date = preparedAppOpenDate,
            Date().timeIntervalSince(date) >= 0, Date().timeIntervalSince(date) < 4 * 60 * 60 {
             appOpenLog.info("Using preloaded app-open ad")
-            return ad
+            return
         }
-        if let task = appOpenPreloadTask, preloadUnitID == unitID { return try await task.value }
+        if let task = appOpenPreloadTask, preloadUnitID == unitID {
+            try await task.value
+            return
+        }
         appOpenPreloadTask?.cancel()
         preparedAppOpen = nil
         preparedAppOpenDate = nil
@@ -197,7 +200,7 @@ final class RewardedAds: NSObject, ObservableObject, FullScreenContentDelegate {
         let requestID = UUID()
         preloadRequestID = requestID
         // This task belongs to the inventory cache, not a splash-screen deadline.
-        let task = Task { @MainActor [weak self] () throws -> AppOpenAd in
+        let task = Task<Void, Error> { @MainActor [weak self] in
             let began = ContinuousClock.now
             do {
                 let ad = try await AppOpenAd.load(with: unitID, request: Request())
@@ -210,7 +213,6 @@ final class RewardedAds: NSObject, ObservableObject, FullScreenContentDelegate {
                 self.preloadUnitID = nil
                 self.preloadRequestID = nil
                 self.appOpenLog.info("App-open inventory ready after \(began.duration(to: .now).description, privacy: .public)")
-                return ad
             } catch {
                 if let self, self.preloadRequestID == requestID {
                     self.appOpenPreloadTask = nil
@@ -223,7 +225,7 @@ final class RewardedAds: NSObject, ObservableObject, FullScreenContentDelegate {
             }
         }
         appOpenPreloadTask = task
-        return try await task.value
+        try await task.value
     }
 
     // Cold start includes pre-login guest preparation. Foreground returns use the same gate.
@@ -310,12 +312,12 @@ final class RewardedAds: NSObject, ObservableObject, FullScreenContentDelegate {
                     self.finishAppOpen(attempt: attempt, reason: "interval-not-due")
                     return
                 }
-                let ad = try await self.preloadAppOpen(unitID: unitID)
+                try await self.preloadAppOpen(unitID: unitID)
                 try Task.checkCancellation()
                 guard self.appOpenAttempt == attempt, commerce.api.session?.userId.value == owner,
                       commerce.rightsVerified, !commerce.premium, UIApplication.shared.applicationState == .active,
                       !self.busy, !self.isPresenting, !commerce.busy, !commerce.preparingPurchase,
-                      !accountAccess.isBusy,
+                      !accountAccess.isBusy, self.preparedUnitID == unitID, let ad = self.preparedAppOpen,
                       AppOpenTiming.isDue(intervalMinutes: interval,
                         lastShown: UserDefaults.standard.object(forKey: key) as? Date) else {
                     self.finishAppOpen(attempt: attempt, reason: "conditions-changed"); return
