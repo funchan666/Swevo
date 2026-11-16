@@ -1,27 +1,5 @@
 import SwiftUI
 
-struct ShotPracticeEntry: View {
-    let openJournal: () -> Void
-
-    var body: some View {
-        Button(action: openJournal) {
-            HStack(alignment: .center, spacing: 16) {
-                SwevoIllustration(name: "PracticeHero", height: 70).frame(width: 70)
-                    .clipShape(.rect(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 6) {
-                    LocalizedText("Shot log").font(.capture(.headline))
-                    LocalizedText("Compare framing, movement and focus across takes.").font(.capture(.subheadline))
-                        .foregroundStyle(SwevoStyle.secondary)
-                }.fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(SwevoStyle.paper)
-                .background { CaptureSurface(tone: .plum) }
-                .contentShape(Rectangle())
-        }.buttonStyle(PressStyle()).accessibilityIdentifier("practice.openJournal")
-    }
-}
-
 @MainActor
 struct ShotPracticeView: View {
     @Environment(\.dismiss) private var dismiss
@@ -36,6 +14,9 @@ struct ShotPracticeView: View {
     @State private var selectedSession: ShotPracticeSession?
     @State private var showingRemoval = false
     @State private var sharedExport: SharedFile?
+    private var emptyHistory: Bool {
+        history && journal.available && journal.completedSessions.isEmpty
+    }
 
     init(initialMovement: ShotMovement = .pushIn, initialSeconds: Int = 6, initialFocusLock: Bool = false) {
         _movement = State(initialValue: initialMovement)
@@ -44,30 +25,31 @@ struct ShotPracticeView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SheetHeading(title: "Shot log") { dismiss() }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ChoiceStrip(values: ["Practice", "Sessions"], selected: history ? "Sessions" : "Practice") {
-                        history = $0 == "Sessions"
-                    }
-                    if let message = journal.storageMessage { ErrorNote(message: message) }
-                    if history { sessions }
-                    else if let session = journal.activeSession { practice(session) }
-                    else { start }
-                }.swevoPage()
-            }.scrollDismissesKeyboard(.interactively)
-        }.swevoScreenBackground().foregroundStyle(SwevoStyle.paper)
+        let practiceDepth: CGFloat = journal.activeSession == nil ? 116 : 84
+        ScenePage(artwork: emptyHistory ? "EmptySessions" : "SceneJournal",
+                  depth: emptyHistory ? 128 : practiceDepth, openingGap: 0, artworkOpacity: 0.45) { _ in
+            SceneTitle(emptyHistory ? "No finished sessions" : "Shot log", size: 34).padding(.trailing, 50)
+        } content: { _ in
+            VStack(alignment: .leading, spacing: 18) {
+                ChoiceStrip(values: ["Practice", "Sessions"], selected: history ? "Sessions" : "Practice") {
+                    history = $0 == "Sessions"
+                }
+                if let message = journal.storageMessage { ErrorNote(message: message) }
+                if history { sessions }
+                else if let session = journal.activeSession { practice(session) }
+                else { start }
+            }
+        }
+            .scrollDismissesKeyboard(.interactively)
+            .sceneDismiss { dismiss() }
             .sheet(item: $selectedSession) { session in sessionDetail(session) }
     }
 
     private var start: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SwevoIllustration(name: "PracticeHero", height: 150)
-            LocalizedText("Plan one move, record the result, and keep the setup that worked.").font(.capture(.title3, display: true))
-                .fixedSize(horizontal: false, vertical: true)
-            TextField("Shot or scene name", text: $title).submitLabel(.done).swevoField()
-            ActionButton(title: "Start a shot session") {
+            EmptyStateCopy(message: "Pick a camera move and log the result after each take.")
+            TextField("Shot name (optional)", text: $title).submitLabel(.done).swevoField()
+            EmptyStateAction(title: "Start session", symbol: .edit) {
                 if journal.beginSession(title: title) { title = "" }
             }.disabled(!journal.available)
         }
@@ -76,24 +58,25 @@ struct ShotPracticeView: View {
     private func practice(_ session: ShotPracticeSession) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             sessionTitle(session).font(.capture(.title3, display: true))
-            LocalizedText("Set the move and target length before shooting. Mark the result after you watch the take.").font(.capture(.subheadline))
+            LocalizedText("Set the move and duration before filming. Review the take, then log the result.")
+                .font(.capture(.subheadline))
                 .foregroundStyle(SwevoStyle.secondary)
             LocalizedText("Camera move").font(.capture(.headline))
             ChoiceStrip(values: ShotMovement.allCases.map(\.label), selected: movement.label) { label in
                 if let selection = ShotMovement.allCases.first(where: { $0.label == label }) { movement = selection }
             }
-            LocalizedText("Target length").font(.capture(.headline))
+            LocalizedText("Target duration").font(.capture(.headline))
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) { amountControls }
                 VStack(alignment: .leading, spacing: 8) { amountControls }
             }
             Button { lockedFocus.toggle() } label: {
-                LocalizedText(lockedFocus ? "Focus locked" : "Auto focus")
+                LocalizedText(lockedFocus ? "Focus locked" : "Autofocus")
             }.buttonStyle(CompactActionStyle())
                 .accessibilityAddTraits(lockedFocus ? .isSelected : [])
             TextField("Take note (optional)", text: $note, axis: .vertical)
                 .lineLimit(2...5).swevoField()
-            LocalizedText("How did that take go?").font(.capture(.headline))
+            LocalizedText("Take result").font(.capture(.headline))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), spacing: 10)], spacing: 10) {
                 ForEach(ShotResult.allCases) { result in
                     ActionButton(title: result.label, primary: result.countsAsSuccess) {
@@ -126,8 +109,11 @@ struct ShotPracticeView: View {
     }
 
     @ViewBuilder private var sessions: some View {
-        if journal.completedSessions.isEmpty {
-            MessagePanel(title: "No finished sessions", message: "Finish a practice session to review its takes here.")
+        if emptyHistory {
+            VStack(alignment: .leading, spacing: 14) {
+                EmptyStateCopy(message: "Finish a practice session to review its takes here.")
+                EmptyStateAction(title: "Back to practice", symbol: .edit) { history = false }
+            }
         }
         ForEach(journal.completedSessions) { session in
             Button { selectedSession = session } label: {
@@ -190,7 +176,7 @@ struct ShotPracticeView: View {
                 Text(verbatim: "\(seconds) s").monospacedDigit()
                 LocalizedText(take.result.label)
             }.font(.capture(.subheadline)).foregroundStyle(SwevoStyle.accent)
-            LocalizedText(take.lockedFocus ? "Focus locked" : "Auto focus")
+            LocalizedText(take.lockedFocus ? "Focus locked" : "Autofocus")
                 .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
             if !take.note.isEmpty { Text(verbatim: take.note).font(.capture(.subheadline)) }
         }.padding(14).frame(maxWidth: .infinity, alignment: .leading)

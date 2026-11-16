@@ -1,4 +1,5 @@
 import AVFoundation
+import OSLog
 import SwiftUI
 
 // Progress ticks belong to the scrubber, not the entire video/control hierarchy.
@@ -31,6 +32,7 @@ final class PlaybackController: ObservableObject {
     private var pendingSeek: Double?
     private var seeking = false
     private var loadingDeadline: Task<Void, Never>?
+    private let diagnostics = Logger(subsystem: "app.swevo", category: "Playback")
 
     init() {
         player.automaticallyWaitsToMinimizeStalling = true
@@ -54,13 +56,9 @@ final class PlaybackController: ObservableObject {
         }
     }
     func load(_ url: URL, autoplay: Bool) {
-        let item = AVPlayerItem(asset: AVURLAsset(url: url))
-        load(item, autoplay: autoplay)
-        loadedURL = url
-    }
-    func load(_ item: AVPlayerItem, autoplay: Bool) {
         release()
-        error = nil
+        loadedURL = url
+        let item = AVPlayerItem(asset: AVURLAsset(url: url))
         isLoading = true
         if wantsPlayback != autoplay { wantsPlayback = autoplay }
         // Zero leaves buffering/variant selection to AVFoundation for the active video.
@@ -71,8 +69,11 @@ final class PlaybackController: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token, self.player.currentItem === observed else { return }
                 if observed.status == .failed {
-                    self.fail(observed.error?.localizedDescription ?? "This clip could not be played.")
+                    self.failMedia("item", underlying: observed.error,
+                                   onlineMessage: "This online video could not be played. Check the link or try again.")
                 } else if observed.status == .readyToPlay {
+                    let duration = observed.duration.seconds
+                    if duration.isFinite && duration > 0 { self.timeline.duration = duration }
                     if self.pendingSeek != nil { self.performPendingSeek() }
                     else if self.wantsPlayback { self.play() }
                     else { self.prerollIfReady() }
@@ -87,10 +88,12 @@ final class PlaybackController: ObservableObject {
                 self.seek(0)
             }
         }
-        failureObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+        failureObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self] notification in
+            let underlying = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token else { return }
-                self.fail("Playback was interrupted. Check your connection and try again.")
+                self.failMedia("interrupted", underlying: underlying,
+                               onlineMessage: "Playback was interrupted. Check your connection and try again.")
             }
         }
     }
@@ -181,12 +184,34 @@ final class PlaybackController: ObservableObject {
             loadingDeadline = Task { [weak self] in
                 do { try await Task.sleep(for: .seconds(20)) } catch { return }
                 guard let self, self.generation == token, self.wantsPlayback, self.isLoading else { return }
-                self.fail("This video is taking too long to load. Check your connection and retry.")
+                self.failMedia("timeout", underlying: nil,
+                               onlineMessage: "This video is taking too long to load. Check your connection and retry.")
             }
         } else if !loading || !wantsPlayback {
             loadingDeadline?.cancel()
             loadingDeadline = nil
         }
+    }
+    private func failMedia(_ stage: String, underlying: Error?, onlineMessage: String) {
+        let failure = underlying.map { $0 as NSError }
+        var source = "online"
+        var message = onlineMessage
+        if let url = loadedURL, url.isFileURL {
+            let readable = FileManager.default.isReadableFile(atPath: url.path)
+            source = readable ? "local-readable" : "local-unreadable"
+            message = readable ? "This clip could not be played." : "This video file is missing or unreadable. Open it again or download a new copy."
+        }
+        let cause = failure?.userInfo[NSUnderlyingErrorKey] as? NSError
+        diagnostics.error("Playback failed; stage=\(stage, privacy: .public), source=\(source, privacy: .public), domain=\(failure?.domain ?? "none", privacy: .public), code=\(failure?.code ?? 0), causeDomain=\(cause?.domain ?? "none", privacy: .public), causeCode=\(cause?.code ?? 0)")
+        if #available(iOS 27, *), let item = player.currentItem {
+            let diagnostics = self.diagnostics
+            item.fetchErrorLog { log in
+                if let event = log?.events.last {
+                    diagnostics.error("Media response; domain=\(event.errorDomain, privacy: .public), code=\(event.errorStatusCode)")
+                }
+            }
+        }
+        fail(message)
     }
     private func fail(_ message: String) {
         pause()
@@ -208,6 +233,7 @@ final class PlaybackController: ObservableObject {
         loadedURL = nil
         timeline.elapsed = 0
         timeline.duration = 0
+        error = nil
         isLoading = false
     }
     deinit {

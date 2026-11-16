@@ -293,14 +293,17 @@ struct AccountSettingsSection: View {
     private var unavailable: Bool { accountAccess.isBusy || commerce.busy || commerce.preparingPurchase || ads.busy || ads.isPreparingAppOpen || ads.isPresenting }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
+            LocalizedText("Settings").font(.capture(.title3, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
             Button { languagePicker = true } label: {
-                AccountMenuRow(title: "App language", detail: AppLanguage(rawValue: languageCode)?.nativeName ?? "Follow system")
+                AccountMenuRow(title: "App language", detail: AppLanguage(rawValue: languageCode)?.nativeName ?? "Follow system",
+                               symbol: .settings)
             }.buttonStyle(PressStyle())
-                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+                .swevoGlass(cornerRadius: 16)
                 .accessibilityIdentifier("account.language")
-            VStack(alignment: .leading, spacing: 12) {
-                LocalizedText("Privacy & terms").font(.capture(.headline))
+            if api.configuration.privacyURL != nil || api.configuration.termsURL != nil
+                || api.configuration.websiteURL != nil || ads.privacyOptionsRequired {
                 VStack(spacing: 0) {
                     if let url = api.configuration.privacyURL {
                         Button { document = PolicyDocument(title: "Privacy Policy", url: url) } label: {
@@ -325,13 +328,15 @@ struct AccountSettingsSection: View {
                         }.accessibilityIdentifier("account.officialWebsite")
                     }
                     if ads.privacyOptionsRequired {
-                        rowDivider
+                        if api.configuration.privacyURL != nil || api.configuration.termsURL != nil
+                            || api.configuration.websiteURL != nil { rowDivider }
                         Button { Task { await ads.privacyOptions() } } label: {
                             AccountMenuRow(title: "Advertising privacy")
                         }
                     }
-                }.background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 22))
-                    .buttonStyle(PressStyle()).disabled(unavailable)
+                }.buttonStyle(PressStyle())
+                    .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .disabled(unavailable)
             }
             if let websiteError { ErrorNote(message: websiteError) }
             if let error = ads.error { ErrorNote(message: error) }
@@ -341,7 +346,7 @@ struct AccountSettingsSection: View {
     }
 
     private var rowDivider: some View {
-        Divider().overlay(SwevoStyle.line).padding(.horizontal, 20)
+        Divider().overlay(SwevoStyle.line).padding(.horizontal, 14).accessibilityHidden(true)
     }
 
 }
@@ -350,21 +355,23 @@ struct AccountSettingsSection: View {
 private struct AccountMenuRow: View {
     let title: String
     var detail: String? = nil
-    var destructive = false
+    var symbol: SwevoGlyph? = nil
+
     var body: some View {
         HStack(spacing: 12) {
+            if let symbol { Glyph(symbol: symbol, size: 18, tint: SwevoStyle.accent) }
             VStack(alignment: .leading, spacing: 4) {
                 LocalizedText(title).font(.capture(.subheadline, weight: .medium))
-                    .foregroundStyle(destructive ? SwevoStyle.danger : SwevoStyle.paper)
+                    .foregroundStyle(SwevoStyle.paper)
                 if let detail {
-                    LocalizedText(detail).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                    LocalizedText(detail).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
                 }
             }.fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             Glyph(symbol: .back, size: 12, tint: SwevoStyle.secondary)
                 .rotationEffect(.degrees(180)).frame(width: 20, height: 24)
                 .allowsHitTesting(false)
-        }.padding(.horizontal, 18).padding(.vertical, 12)
+        }.padding(.horizontal, 14).padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
             .contentShape(.interaction, Rectangle())
     }

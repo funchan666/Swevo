@@ -5,6 +5,8 @@ struct MembershipView: View {
     var rewardKind: AllowanceKind? = nil
     var exportRequired = false
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .body) private var pairedMinimumWidth: CGFloat = 316
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var commerce: CommerceStore
     @EnvironmentObject private var quota: QuotaStore
@@ -13,11 +15,13 @@ struct MembershipView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedID: String?
-    @State private var attemptedPurchaseAction = false
+    @State private var purchaseAction: PurchaseAction?
     @State private var purchaseTask: Task<Void, Never>?
     @State private var rewardTask: Task<Void, Never>?
     @State private var requestedReward = false
     @State private var acknowledgedLuckyReward = false
+
+    private enum PurchaseAction { case subscribe, restore }
 
     private var plans: [SKProduct] {
         (commerce.policy?.products ?? []).compactMap { entry in
@@ -31,67 +35,16 @@ struct MembershipView: View {
     private var interactionLocked: Bool { purchasing || commerce.loadingPlans || ads.busy || ads.isPresenting }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                membershipIntro
-
-                if exportRequired {
-                    LocalizedText("Export is included with Plus.")
-                        .font(.capture(.subheadline, weight: .semibold)).foregroundStyle(SwevoStyle.paper)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if commerce.premium {
-                    VStack(alignment: .leading, spacing: 10) {
-                        LocalizedText("Your membership is active").font(.capture(.headline))
-                        if let expiration = commerce.expiration {
-                            LocalizedText("Access through \(expiration.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))).")
-                                .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                        }
-                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                        .background { CaptureSurface(tone: .mist) }
-                    renewalDisclosure
-                } else {
-                    if api.session == nil { ConnectionPanel() }
-                    if !plans.isEmpty { planPicker }
-                    if let error = commerce.plansError {
-                        ErrorNote(message: error)
-                        Button("Retry") { Task { await commerce.loadPlans() } }
-                            .buttonStyle(CompactActionStyle()).disabled(interactionLocked)
-                    }
-                    renewalDisclosure
-                    VStack(spacing: 12) {
-                        purchaseAction
-                        if purchasing {
-                            loadingMark(width: 42)
-                        }
-                    }
-                }
-
-                restoreLink
-
-                if attemptedPurchaseAction {
-                    if let error = commerce.error { ErrorNote(message: error) }
-                    if let message = commerce.message {
-                        LocalizedText(message).font(.capture(.subheadline)).foregroundStyle(SwevoStyle.accent)
-                    }
-                }
-
-                PolicyLinks(compact: true)
-
-                studioArtwork
-
-                if !exportRequired, !commerce.premium, api.session != nil { rewardOption }
-            }.swevoPage()
+        ScenePage(artwork: "ScenePlusCover", depth: 140, openingGap: 0, artworkOpacity: 0.58) { _ in
+            SceneTitle("Swevo Plus", size: 42)
+                .padding(.top, 54)
+        } content: { container in
+            membershipContent(in: container)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            SheetHeading(title: "Plus") {
-                cancelRewardRequest()
-                dismiss()
-            }
-                .disabled(purchasing || ads.isPresenting).padding(.bottom, 8)
-                .swevoScreenBackground()
+        .sceneDismiss(disabled: purchasing || ads.isPresenting) {
+            cancelRewardRequest()
+            dismiss()
         }
-        .swevoScreenBackground().foregroundStyle(.white)
         .task {
             async let rights: Void = commerce.refresh()
             await commerce.loadPlans()
@@ -117,98 +70,203 @@ struct MembershipView: View {
         }
     }
 
+    private func membershipContent(in container: GeometryProxy) -> some View {
+        let width = SwevoStyle.pageContentWidth(in: container)
+        let bounds = CGRect(origin: .zero, size: container.size)
+        let allowsColumns = !typeSize.isAccessibilitySize && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+        let wide = allowsColumns && width >= 620
+        let paired = allowsColumns && width >= pairedMinimumWidth && !wide
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 32))
+                          : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+
+        return VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                restoreLink
+                if purchaseAction == .restore { purchaseFeedback }
+            }
+            layout {
+                benefits(paired: paired)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 8) {
+                    if commerce.premium {
+                        activeMembership
+                        renewalDisclosure
+                    } else {
+                        checkout(paired: paired)
+                    }
+                    if purchaseAction == .subscribe { purchaseFeedback }
+                    PolicyLinks(compact: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if !exportRequired, !commerce.premium, api.session != nil { rewardOption }
+        }
+    }
+
+    private func benefits(paired: Bool) -> some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .topLeading), count: paired ? 2 : 1)
+        return VStack(alignment: .leading, spacing: 12) {
+            if exportRequired {
+                LocalizedText("Export is included with Plus.")
+                    .font(.capture(.subheadline, weight: .semibold)).foregroundStyle(SwevoStyle.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            benefit(.edit, "MP4 video export", "Up to 1080p")
+            benefit(.sound, "M4A audio export", "Extract audio from video.")
+            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                benefit(.play, "Unlimited lesson views")
+                benefit(.download, "Unlimited offline downloads")
+                benefit(.home, "Skip opening ads")
+                benefit(.bookmark, "Shot presets")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(LocalizedStringKey("Plus benefits"))
+    }
+
+    private func benefit(_ symbol: SwevoGlyph, _ title: String, _ detail: String? = nil) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Glyph(symbol: symbol, size: 17, tint: SwevoStyle.accent)
+                .frame(width: 22, height: 22)
+            VStack(alignment: .leading, spacing: 3) {
+                LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+                if let detail {
+                    LocalizedText(detail).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var activeMembership: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            LocalizedText("Plus active").font(.capture(.headline)).foregroundStyle(SwevoStyle.accent)
+            if let expiration = commerce.expiration {
+                let date = expiration.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
+                LocalizedText("Access through %@.", date)
+                    .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .swevoGlass(cornerRadius: 18)
+    }
+
+    @ViewBuilder private var purchaseFeedback: some View {
+        if let error = commerce.error { ErrorNote(message: error) }
+        if let message = commerce.message {
+            LocalizedText(message).font(.capture(.subheadline)).foregroundStyle(SwevoStyle.accent)
+        }
+    }
+
+    private func checkout(paired: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if api.session == nil { ConnectionPanel() }
+            if !plans.isEmpty { planPicker(paired: paired) }
+            if let error = commerce.plansError {
+                ErrorNote(message: error)
+                ActionButton(title: "Retry", primary: false) { Task { await commerce.loadPlans() } }
+                    .disabled(interactionLocked)
+            }
+            if selectedPlan != nil { renewalDisclosure }
+            if selectedPlan != nil || commerce.loadingPlans || purchasing { subscribeButton }
+        }
+    }
+
     private var purchaseButtonTitle: String {
-        if commerce.loadingProducts || commerce.loadingPlans { return "Checking with Apple…" }
-        if commerce.preparingPurchase { return "Preparing your subscription…" }
-        if commerce.busy { return "Confirming your purchase…" }
+        if commerce.preparingPurchase { return "Preparing purchase…" }
+        if commerce.busy { return "Checking purchases…" }
+        if commerce.loadingPlans { return "Loading plans…" }
         return "Subscribe"
     }
 
-    private var membershipIntro: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            membershipCopy(titleColor: SwevoStyle.paper, detailColor: SwevoStyle.secondary)
-            Divider().overlay(SwevoStyle.line)
+    private func planPicker(paired: Bool) -> some View {
+        let sideBySide = paired && plans.count == 2
+        let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 4))
+                                : AnyLayout(VStackLayout(spacing: 4))
+        return layout {
+            ForEach(plans, id: \.productIdentifier) { plan in
+                planOption(plan, sideBySide: sideBySide)
+            }
         }
+        .padding(4)
+        .swevoGlass(cornerRadius: 18)
     }
 
-    private var studioArtwork: some View {
-        membershipArtwork(2.5)
-            .clipShape(.rect(cornerRadius: 4))
-            .padding(4)
-            .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 6))
-    }
-
-    private func membershipCopy(titleColor: Color, detailColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            membershipTitle.foregroundStyle(titleColor)
-            LocalizedText("Unlimited views, downloads and media exports.")
-                .font(.capture(.subheadline)).foregroundStyle(detailColor)
-                .fixedSize(horizontal: false, vertical: true)
-        }.frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var membershipTitle: some View {
-        LocalizedText("Studio access")
-            .font(.capture(.title, display: true))
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private func membershipArtwork(_ ratio: CGFloat) -> some View {
-        Color.clear.aspectRatio(ratio, contentMode: .fit)
-            .overlay {
-                GeometryReader { frame in
-                    Image("PlusArtwork").resizable().scaledToFill()
-                        .frame(width: frame.size.width, height: frame.size.height)
-                        .clipped()
-                }
-            }.accessibilityHidden(true).allowsHitTesting(false)
-    }
-
-    private var planPicker: some View {
-        VStack(spacing: 2) { planOptions }
-            .padding(4).background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 6))
-    }
-
-    private var planOptions: some View {
-        ForEach(plans, id: \.productIdentifier) { plan in
-            planOption(plan)
-        }
-    }
-
-    private func planOption(_ product: SKProduct) -> some View {
+    private func planOption(_ product: SKProduct, sideBySide: Bool) -> some View {
         let selected = selectedPlan?.productIdentifier == product.productIdentifier
         let price = commerce.price(product)
         let period = commerce.period(product, locale: locale)
-        let ink = selected ? SwevoStyle.ink : SwevoStyle.paper
-        let secondary = selected ? SwevoStyle.paperSecondary : SwevoStyle.secondary
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         return Button { selectedID = product.productIdentifier } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(verbatim: product.localizedTitle).font(.capture(.headline, weight: .semibold))
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        LocalizedText("Billed every %@", period).font(.capture(.caption)).foregroundStyle(secondary)
-                            .fixedSize(horizontal: true, vertical: false)
-                        Spacer(minLength: 0)
-                        Text(verbatim: price).environment(\.layoutDirection, .leftToRight)
-                            .font(.capture(.title3, display: true)).monospacedDigit()
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
+            Group {
+                if sideBySide {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: price).environment(\.layoutDirection, .leftToRight)
-                            .font(.capture(.title3, display: true)).monospacedDigit()
-                        LocalizedText("Billed every %@", period).font(.capture(.caption)).foregroundStyle(secondary)
+                        planName(product, selected: selected)
+                        planPrice(price, selected: selected)
+                        planPeriod(period)
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                planName(product, selected: selected)
+                                planPeriod(period)
+                            }.fixedSize(horizontal: true, vertical: false)
+                            Spacer(minLength: 0)
+                            planPrice(price, selected: selected).fixedSize(horizontal: true, vertical: false)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            planName(product, selected: selected)
+                            planPrice(price, selected: selected)
+                            planPeriod(period)
+                        }
                     }
                 }
-            }.fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12).padding(.vertical, 10)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .foregroundStyle(ink)
-                .background(selected ? SwevoStyle.accent : SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 4))
-                .contentShape(Rectangle())
+            }.padding(.horizontal, 12).padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
+                .foregroundStyle(SwevoStyle.paper)
+                .background(selected ? SwevoStyle.accent.opacity(0.12) : Color.clear, in: shape)
+                .overlay { shape.strokeBorder(selected ? SwevoStyle.accent.opacity(0.75) : Color.clear).allowsHitTesting(false) }
+                .contentShape(shape)
         }.buttonStyle(PressStyle()).disabled(interactionLocked)
+            .accessibilityElement(children: .combine)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .accessibilityIdentifier("membership.plan.\(product.productIdentifier)")
+    }
+
+    private func planName(_ product: SKProduct, selected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .strokeBorder(selected ? SwevoStyle.accent : SwevoStyle.secondary, lineWidth: selected ? 4 : 1)
+                .frame(width: 12, height: 12).accessibilityHidden(true)
+            Group {
+                if let period = product.subscriptionPeriod, period.numberOfUnits == 1, period.unit == .month {
+                    LocalizedText("Monthly")
+                } else if let period = product.subscriptionPeriod, period.numberOfUnits == 1, period.unit == .year {
+                    LocalizedText("Yearly")
+                } else {
+                    Text(verbatim: product.localizedTitle)
+                }
+            }.font(.capture(.subheadline, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func planPeriod(_ period: String) -> some View {
+        LocalizedText("Billed every %@", period).font(.capture(.footnote))
+            .foregroundStyle(SwevoStyle.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func planPrice(_ price: String, selected: Bool) -> some View {
+        Text(verbatim: price).environment(\.layoutDirection, .leftToRight)
+            .font(.capture(.title2, weight: .semibold)).monospacedDigit()
+            .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var renewalDisclosure: some View {
@@ -217,19 +275,20 @@ struct MembershipView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var purchaseAction: some View {
+    private var subscribeButton: some View {
         Button(action: subscribe) {
             HStack(spacing: 12) {
                 LocalizedText(purchaseButtonTitle).font(.capture(.headline, display: true))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Glyph(symbol: .library, size: 18, tint: SwevoStyle.accent)
-                    .frame(width: 36, height: 36)
-                    .background(SwevoStyle.ink, in: RoundedRectangle(cornerRadius: 3))
-                    .accessibilityHidden(true)
-            }.padding(.horizontal, 10).padding(.vertical, 7).frame(minHeight: 50)
+                if purchasing || commerce.loadingPlans {
+                    loadingMark(width: 30, tint: SwevoStyle.ink)
+                } else if selectedPlan != nil {
+                    Glyph(symbol: .back, size: 16, tint: SwevoStyle.ink).rotationEffect(.degrees(180))
+                }
+            }.padding(.horizontal, 16).padding(.vertical, 12).frame(minHeight: 54)
                 .foregroundStyle(SwevoStyle.ink)
-                .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 5))
+                .background { CaptureSurface(tone: .accent) }
                 .contentShape(Rectangle())
         }.buttonStyle(PressStyle())
             .disabled(interactionLocked || selectedPlan == nil)
@@ -238,7 +297,7 @@ struct MembershipView: View {
 
     private func subscribe() {
         guard !interactionLocked, let plan = selectedPlan else { return }
-        attemptedPurchaseAction = true
+        purchaseAction = .subscribe
         purchaseTask = Task {
             await commerce.purchase(planID: plan.productIdentifier)
             purchaseTask = nil
@@ -247,12 +306,14 @@ struct MembershipView: View {
 
     private var rewardOption: some View {
         VStack(alignment: .leading, spacing: 12) {
-            LocalizedText("Or, keep it free").font(.capture(.headline))
+            LocalizedText("Daily limits").font(.capture(.headline))
             ForEach(rewardKind.map { [$0] } ?? AllowanceKind.allCases) { kind in
                 if quota.canRequestReward(for: kind, premium: commerce.premium) {
-                    LocalizedText(quota.rewardSummary(for: kind)).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-                    if quota.completedAds(kind) >= 3 { AllowanceResetText() }
-                    ActionButton(title: kind == .watch ? "Get more views" : "Get more downloads",
+                    if quota.completedAds(kind) >= 3 {
+                        LocalizedText(quota.rewardSummary(for: kind))
+                            .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    }
+                    ActionButton(title: kind == .watch ? "Watch an ad for more views" : "Watch an ad for more downloads",
                                  primary: false, busy: ads.busy || ads.isPresenting) {
                         requestedReward = true
                         rewardTask = Task { await ads.watch(commerce: commerce, quota: quota, kind: kind) }
@@ -271,7 +332,7 @@ struct MembershipView: View {
             LocalizedText(quota.unlimited ? "Unlimited views today" : "\(quota.watchesLeft) views left today")
             LocalizedText(quota.downloadsUnlimited ? "Unlimited downloads today" : "\(quota.downloadsLeft) downloads left today")
             AllowanceResetText()
-            LocalizedText("Ad rewards unlock when the corresponding allowance runs out.")
+            LocalizedText("After reaching a daily limit, finish an ad to get more views or downloads.")
                 .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary).fixedSize(horizontal: false, vertical: true)
             if let error = ads.error { ErrorNote(message: error) }
             if let error = quota.error { ErrorNote(message: error) }
@@ -288,9 +349,9 @@ struct MembershipView: View {
         ads.cancelRewardLoading()
     }
 
-    private func loadingMark(width: CGFloat) -> some View {
+    private func loadingMark(width: CGFloat, tint: Color = SwevoStyle.accent) -> some View {
         Image("SwevoLoadingMark").renderingMode(.template).resizable().scaledToFit()
-            .foregroundStyle(SwevoStyle.accent)
+            .foregroundStyle(tint)
             .frame(width: width, height: 14)
             .phaseAnimator([false, true]) { content, dimmed in
                 content.opacity(reduceMotion || scenePhase != .active ? 1 : (dimmed ? 0.35 : 1))
@@ -302,17 +363,14 @@ struct MembershipView: View {
 
     private var restoreLink: some View {
         Button {
-            attemptedPurchaseAction = true
+            purchaseAction = .restore
             commerce.restore()
         } label: {
             LocalizedText("Restore purchases")
-                .font(.capture(.footnote, display: true))
+                .font(.capture(.footnote, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12).padding(.vertical, 8)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .foregroundStyle(SwevoStyle.accent)
-                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 4))
-                .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
                 .contentShape(Rectangle())
         }.disabled(interactionLocked).buttonStyle(PressStyle())
             .accessibilityIdentifier("membership.restore")
@@ -320,6 +378,7 @@ struct MembershipView: View {
 }
 
 struct AccountView: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var commerce: CommerceStore
     @EnvironmentObject private var quota: QuotaStore
@@ -331,109 +390,152 @@ struct AccountView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                if let session = api.session {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .firstTextBaseline) {
-                            accountIdentity(session.userId.value)
-                            Spacer(minLength: 16)
-                            accountStatus
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            accountIdentity(session.userId.value)
-                            accountStatus
-                        }
-                    }
-                    membershipCard
-                    allowance
-                } else { ConnectionPanel() }
-                AccountSettingsSection()
-                LocalizedText("Version \(api.configuration.version)")
-                    .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                    .frame(maxWidth: .infinity).padding(.top, 4)
-            }
-            .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 24)
-            .frame(maxWidth: 600).frame(maxWidth: .infinity)
-        }.swevoScreenBackground().foregroundStyle(.white)
-            .sheet(isPresented: $paywall) { MembershipView() }
+        ScenePage(artwork: nil, depth: 48, openingGap: 0) { _ in
+            SceneTitle("Account", size: 38)
+        } content: { container in
+            accountContent(in: container)
+        }
+        .sheet(isPresented: $paywall) { MembershipView() }
     }
 
-    private func accountIdentity(_ id: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            LocalizedText("Your practice space").font(.capture(.headline)).foregroundStyle(SwevoStyle.paper)
-            LocalizedText("ID · \(id)").font(.caption.monospaced()).foregroundStyle(SwevoStyle.secondary)
-                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+    private func accountContent(in container: GeometryProxy) -> some View {
+        let bounds = CGRect(origin: .zero, size: container.size)
+        let wide = api.session != nil && SwevoStyle.pageContentWidth(in: container) >= 620
+            && !typeSize.isAccessibilitySize && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
+                          : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+
+        return VStack(alignment: .leading, spacing: 24) {
+            layout {
+                Group {
+                    if api.session != nil {
+                        VStack(alignment: .leading, spacing: 12) {
+                            accountDetails
+                            membershipEntry
+                            allowance
+                        }
+                    } else { ConnectionPanel() }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 12) {
+                    AccountSettingsSection()
+                    LocalizedText("Version %@", api.configuration.version)
+                        .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
-    private var accountStatus: some View {
-        LocalizedText(commerce.premium ? "Plus active" : "Free plan")
-            .font(.capture(.caption, weight: .semibold))
-            .foregroundStyle(commerce.premium ? SwevoStyle.accent : SwevoStyle.secondary)
+    @ViewBuilder private var accountDetails: some View {
+        if let id = api.session?.userId.value {
+            VStack(alignment: .leading, spacing: 4) {
+                SectionLabel(title: "Account details").accessibilityAddTraits(.isHeader)
+                LocalizedText("ID · %@", id).monospacedDigit().textSelection(.enabled)
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+            }.fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
-    private var membershipCard: some View {
+    private var membershipEntry: some View {
         Button { paywall = true } label: {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    membershipCopy
-                    CaptureArtwork(kind: .pass, height: 126).frame(width: 132)
-                }
-                VStack(alignment: .leading, spacing: 12) {
-                    CaptureArtwork(kind: .pass, height: 100)
-                    membershipCopy
-                }
-            }
-            .padding(22).frame(maxWidth: .infinity, alignment: .leading)
-            .background(SwevoStyle.paper, in: RoundedRectangle(cornerRadius: 24))
-            .contentShape(.interaction, RoundedRectangle(cornerRadius: 24))
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    LocalizedText(commerce.premium ? "Plus active" : "Free plan")
+                        .font(.capture(.footnote, weight: .semibold))
+                    LocalizedText(commerce.premium ? "View membership" : "View Plus plans")
+                        .font(.capture(.headline))
+                }.fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Glyph(symbol: .back, size: 15, tint: SwevoStyle.ink).rotationEffect(.degrees(180))
+            }.padding(.horizontal, 16).padding(.vertical, 12)
+                .frame(minHeight: 62)
+                .foregroundStyle(SwevoStyle.ink)
+                .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 18))
+                .contentShape(RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(PressStyle()).disabled(unavailable)
             .accessibilityIdentifier("account.membership")
     }
 
-    private var membershipCopy: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LocalizedText(commerce.premium ? "Your all-access pass." : "Go further with Plus.")
-                .font(.capture(.title3, weight: .semibold)).foregroundStyle(SwevoStyle.ink)
-            LocalizedText("Unlimited views. Unlimited downloads.")
-                .font(.capture(.footnote)).foregroundStyle(SwevoStyle.paperSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            LocalizedText(commerce.premium ? "Manage membership" : "Explore plans")
-                .font(.capture(.footnote, weight: .semibold)).foregroundStyle(SwevoStyle.ink)
-                .padding(.top, 8)
-        }.fixedSize(horizontal: false, vertical: true)
-    }
-
     private var allowance: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                LocalizedText("Today").font(.capture(.headline))
-                Spacer()
-                if !commerce.premium {
-                    Button("Get more") { paywall = true }
-                        .font(.capture(.footnote, weight: .semibold)).foregroundStyle(SwevoStyle.accent)
-                        .frame(minHeight: 44).buttonStyle(PressStyle()).disabled(unavailable)
-                        .accessibilityLabel("Get more daily views and downloads")
+        VStack(alignment: .leading, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    allowanceTitle.fixedSize()
+                    Spacer(minLength: 0)
+                    if !commerce.premium { moreAllowance.fixedSize(horizontal: true, vertical: false) }
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    allowanceTitle
+                    if !commerce.premium { moreAllowance }
                 }
             }
-            HStack(alignment: .top, spacing: 20) {
-                balance(value: commerce.premium || quota.unlimited ? "Unlimited" : "\(quota.watchesLeft)", label: "Views left")
-                balance(value: commerce.premium || quota.downloadsUnlimited ? "Unlimited" : "\(quota.downloadsLeft)", label: "Downloads left")
+            if commerce.premium || quota.usage != nil {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .bottom, spacing: 16) {
+                        balance(.watch).fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        balance(.download).fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    VStack(alignment: .leading, spacing: 14) {
+                        balance(.watch)
+                        balance(.download)
+                    }
+                }
+                Divider().overlay(SwevoStyle.ink.opacity(0.12)).accessibilityHidden(true)
+                if commerce.premium {
+                    LocalizedText("Included with your membership")
+                        .font(.capture(.footnote)).foregroundStyle(SwevoStyle.paperSecondary)
+                } else {
+                    AllowanceResetText(tint: SwevoStyle.paperSecondary)
+                }
+            } else {
+                LocalizedText(quota.error ?? "Loading daily limits…")
+                    .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.paperSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if commerce.premium {
-                LocalizedText("Included with your membership").font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-            } else { AllowanceResetText() }
         }
+        .padding(16)
+        .foregroundStyle(SwevoStyle.ink)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SwevoStyle.paper, in: RoundedRectangle(cornerRadius: 20))
     }
 
-    private func balance(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            LocalizedText(value).font(value == "Unlimited" ? .headline : .title.weight(.semibold))
-                .monospacedDigit().foregroundStyle(SwevoStyle.paper)
-                .fixedSize(horizontal: false, vertical: true)
-            LocalizedText(label).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+    private var allowanceTitle: some View {
+        LocalizedText("Today’s lesson limits").font(.capture(.title3, weight: .semibold))
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var moreAllowance: some View {
+        Button { paywall = true } label: {
+            HStack(spacing: 6) {
+                LocalizedText("Get more").font(.capture(.footnote, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Glyph(symbol: .back, size: 11, tint: SwevoStyle.paperSecondary).rotationEffect(.degrees(180))
+            }.frame(minWidth: 44, minHeight: 44)
+                .foregroundStyle(SwevoStyle.paperSecondary)
+                .contentShape(Rectangle())
+        }.buttonStyle(PressStyle()).disabled(unavailable)
+            .accessibilityLabel("Get more daily views and downloads")
+    }
+
+    private func balance(_ kind: AllowanceKind) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if commerce.premium || quota.isUnlimited(kind) {
+                LocalizedText("Unlimited").font(.capture(.title3, weight: .semibold))
+            } else {
+                Text(quota.remaining(kind), format: .number)
+                    .font(.capture(.largeTitle, weight: .semibold)).monospacedDigit()
+            }
+            HStack(spacing: 6) {
+                Glyph(symbol: kind == .watch ? .play : .download, size: 14, tint: SwevoStyle.paperSecondary)
+                LocalizedText(kind == .watch ? "Views left" : "Downloads left")
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.paperSecondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -446,16 +548,22 @@ struct LuckyRewardView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 16) {
-                    CaptureArtwork(kind: .pass, height: 108)
+                    SceneImage(name: "ScenePlus").frame(height: 100)
+                        .mask { LinearGradient(stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.70),
+                            .init(color: .clear, location: 1)
+                        ], startPoint: .top, endPoint: .bottom) }
+                        .padding([.top, .horizontal], -20)
                         .scaleEffect(appeared || reduceMotion ? 1 : 0.88)
-                        .accessibilityHidden(true)
-                    LocalizedText("A little luck, on us").font(.capture(.headline)).foregroundStyle(.white)
-                    LocalizedText("No ad is available right now. \(message)")
+                    LocalizedText("No ad available").font(.capture(.headline)).foregroundStyle(.white)
+                    LocalizedText(message)
                         .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
                         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-                    ActionButton(title: "Keep exploring", action: dismiss)
+                    ActionButton(title: "Close", action: dismiss)
                 }.padding(20).frame(maxWidth: 360)
                     .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 28))
+                    .clipShape(.rect(cornerRadius: 28))
                     .padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
             }
         }.background(Color.black.opacity(0.68).ignoresSafeArea())
@@ -466,12 +574,13 @@ struct LuckyRewardView: View {
 
 
 struct AllowanceResetText: View {
+    var tint: Color = SwevoStyle.secondary
     @Environment(\.locale) private var locale
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let next = QuotaStore.nextReset(after: context.date)
             LocalizedText("Resets %@ (local time)", localTime(next))
-                .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                .font(.capture(.caption)).foregroundStyle(tint)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

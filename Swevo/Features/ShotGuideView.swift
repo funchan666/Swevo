@@ -7,14 +7,23 @@ private struct ShotNote: Identifiable {
         let body: String
         init(_ title: String, _ body: String) { self.title = title; self.body = body }
     }
+    enum Cover: String {
+        case steady = "SceneShot"
+        case track = "SceneTrack"
+        case reveal = "SceneReveal"
+        case parallax = "SceneParallax"
+        case focus = "GuideFocus"
+        case setup = "SceneSetup"
+    }
     let id: String
     let category: String
     let title: String
     let shortTitle: String
     let summary: String
-    let cover: GuideArtwork.Subject
+    let cover: Cover
     let sections: [Section]
     let takeaway: String
+    var artwork: String { cover.rawValue }
 
     static let all: [ShotNote] = [
         ShotNote(
@@ -56,30 +65,6 @@ private struct ShotNote: Identifiable {
     ]
 }
 
-// Shared entry point for Home and the Practice tab.
-struct ShotGuideEntry: View {
-    var compact = false
-    let open: () -> Void
-    var body: some View {
-        Button(action: open) {
-            HStack(spacing: 18) {
-                GuideArtwork(subject: .steady).frame(width: compact ? 72 : 94, height: compact ? 88 : 116)
-                VStack(alignment: .leading, spacing: 8) {
-                    LocalizedText("Shot field notes").font(.capture(.headline))
-                        .foregroundStyle(SwevoStyle.paper)
-                    LocalizedText("\(ShotNote.all.count) short reads · Available offline")
-                        .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                }.fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                Glyph(symbol: .back, size: 14, tint: SwevoStyle.accent)
-                    .rotationEffect(.degrees(180)).frame(width: 20)
-            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                .background { CaptureSurface(tone: .plum) }
-                .contentShape(Rectangle())
-        }.buttonStyle(PressStyle()).accessibilityIdentifier("shotGuide.open")
-    }
-}
-
 struct ShotGuideView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -90,43 +75,48 @@ struct ShotGuideView: View {
     }
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                SheetHeading(title: "Shot field notes") { dismiss() }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        ChoiceStrip(values: categories, selected: category) { category = $0 }
-                        if let first = notes.first {
-                            NavigationLink(value: first.id) {
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(spacing: 20) {
-                                        GuideArtwork(subject: first.cover).frame(width: 148, height: 148)
-                                        featuredCopy(first).frame(minWidth: 112, maxWidth: .infinity, alignment: .leading)
-                                    }
-                                    VStack(alignment: .leading, spacing: 14) {
-                                        GuideArtwork(subject: first.cover).aspectRatio(1.4, contentMode: .fit)
-                                        featuredCopy(first)
-                                    }
-                                }.padding(14).foregroundStyle(SwevoStyle.ink)
-                                    .background { CaptureSurface(tone: .blush) }
+            ScenePage(artwork: notes.first?.artwork, depth: 210, openingGap: 0, artworkOpacity: 0.68) { _ in
+                VStack(alignment: .leading, spacing: 8) {
+                    SceneTitle("Shot field notes", size: 34)
+                    if let first = notes.first {
+                        NavigationLink(value: first.id) {
+                            HStack(spacing: 10) {
+                                LocalizedText(first.title).font(.capture(.subheadline, weight: .semibold))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Glyph(symbol: .back, size: 12, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+                            }.padding(.horizontal, 14).padding(.vertical, 8)
+                                .frame(minHeight: 44)
+                                .swevoGlass(cornerRadius: 16)
+                                .foregroundStyle(SwevoStyle.paper)
+                                .contentShape(Rectangle())
+                        }.buttonStyle(PressStyle()).accessibilityIdentifier("shotGuide.\(first.id)")
+                    }
+                }.padding(.trailing, 50)
+            } content: { _ in
+                VStack(alignment: .leading, spacing: 20) {
+                    ChoiceStrip(values: categories, selected: category) { category = $0 }
+                    if let first = notes.first {
+                        LocalizedText(first.summary).font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 260 : 140), spacing: 16)], alignment: .leading, spacing: 22) {
+                        ForEach(Array(notes.dropFirst())) { note in
+                            NavigationLink(value: note.id) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Color.clear.aspectRatio(1.3, contentMode: .fit)
+                                        .background { SceneImage(name: note.artwork) }
+                                    LocalizedText(note.shortTitle).font(.capture(.headline))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    LocalizedText(note.summary).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }.foregroundStyle(SwevoStyle.paper)
                                     .contentShape(Rectangle())
-                            }.buttonStyle(PressStyle()).accessibilityIdentifier("shotGuide.\(first.id)")
+                            }.buttonStyle(PressStyle()).accessibilityIdentifier("shotGuide.\(note.id)")
                         }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 260 : 140), spacing: 16)], alignment: .leading, spacing: 22) {
-                            ForEach(Array(notes.dropFirst())) { note in
-                                NavigationLink(value: note.id) {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        GuideArtwork(subject: note.cover).aspectRatio(1, contentMode: .fit)
-                                        LocalizedText(note.shortTitle).font(.capture(.headline))
-                                            .fixedSize(horizontal: false, vertical: true)
-                                        LocalizedText(note.summary).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }.foregroundStyle(SwevoStyle.paper).contentShape(Rectangle())
-                                }.buttonStyle(PressStyle()).accessibilityIdentifier("shotGuide.\(note.id)")
-                            }
-                        }
-                    }.swevoPage()
+                    }
                 }
-            }.swevoScreenBackground().foregroundStyle(SwevoStyle.paper)
+            }
+                .sceneDismiss { dismiss() }
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: String.self) { id in
                     if let note = ShotNote.all.first(where: { $0.id == id }) {
@@ -135,57 +125,38 @@ struct ShotGuideView: View {
                 }
         }
     }
-    private func featuredCopy(_ note: ShotNote) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LocalizedText(note.category).font(.capture(.caption, weight: .semibold)).foregroundStyle(SwevoStyle.paperSecondary)
-            LocalizedText(note.title).font(.capture(.title3, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
-            LocalizedText(note.summary).font(.capture(.subheadline)).foregroundStyle(SwevoStyle.paperSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
 }
 
 private struct ShotNoteReader: View {
     let note: ShotNote
     @Environment(\.dismiss) private var dismiss
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                IconButton(symbol: .back, label: "Back to shot field notes") { dismiss() }
+        ScenePage(artwork: note.artwork, depth: 222, openingGap: 0, artworkOpacity: 0.68) { _ in
+            VStack(alignment: .leading, spacing: 8) {
                 LocalizedText(note.category).font(.capture(.subheadline, weight: .semibold))
-                    .foregroundStyle(SwevoStyle.secondary)
-                Spacer(minLength: 0)
-            }.padding(.horizontal, 16).padding(.top, 8)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    GuideArtwork(subject: note.cover).aspectRatio(1, contentMode: .fit).frame(maxWidth: 360)
-                    LocalizedText(note.title)
-                        .font(.capture(.title2, display: true))
-                        .foregroundStyle(SwevoStyle.paper).accessibilityAddTraits(.isHeader)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ForEach(note.sections.indices, id: \.self) { index in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text(verbatim: "\(index + 1)").font(.capture(.subheadline, weight: .black)).monospacedDigit()
-                                    .foregroundStyle(SwevoStyle.accent).accessibilityHidden(true)
-                                LocalizedText(note.sections[index].title).font(.capture(.headline))
-                                    .accessibilityAddTraits(.isHeader)
-                            }
-                            LocalizedText(note.sections[index].body).font(.capture(.body)).lineSpacing(5)
-                                .foregroundStyle(SwevoStyle.paper.opacity(0.9))
-                                .textSelection(.enabled)
-                        }.fixedSize(horizontal: false, vertical: true)
-                    }
+                    .foregroundStyle(SwevoStyle.accent)
+                SceneTitle(note.title, size: 34)
+            }.padding(.leading, 50)
+        } content: { _ in
+            VStack(alignment: .leading, spacing: 26) {
+                ForEach(note.sections.indices, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 10) {
-                        LocalizedText("One thing to remember").font(.capture(.caption, weight: .bold))
-                        LocalizedText(note.takeaway).font(.capture(.body, weight: .medium)).lineSpacing(3)
-                    }.foregroundStyle(SwevoStyle.ink)
-                        .padding(22).frame(maxWidth: .infinity, alignment: .leading)
-                        .background { CaptureSurface(tone: .blush) }
-                }.swevoPage()
+                        LocalizedText(note.sections[index].title).font(.capture(.headline))
+                            .accessibilityAddTraits(.isHeader)
+                        LocalizedText(note.sections[index].body).font(.capture(.body)).lineSpacing(5)
+                            .foregroundStyle(SwevoStyle.paper.opacity(0.9))
+                            .textSelection(.enabled)
+                    }.fixedSize(horizontal: false, vertical: true)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    LocalizedText("One thing to remember").font(.capture(.subheadline, weight: .semibold))
+                        .foregroundStyle(SwevoStyle.accent)
+                    LocalizedText(note.takeaway).font(.capture(.body, weight: .medium)).lineSpacing(3)
+                }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background { CaptureSurface(tone: .mist) }
             }
-        }.swevoScreenBackground().foregroundStyle(SwevoStyle.paper)
+        }
+            .sceneDismiss(symbol: .back, label: "Back to shot field notes", edge: .leading) { dismiss() }
             .toolbar(.hidden, for: .navigationBar)
     }
 }

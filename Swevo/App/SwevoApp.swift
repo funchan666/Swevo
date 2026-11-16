@@ -102,8 +102,8 @@ struct SwevoStartupView: View {
 
 enum SwevoTab: Int, CaseIterable, Hashable {
     case home, tools, library, me
-    var name: String { ["Shot log", "Edit", "Library", "Me"][rawValue] }
-    var artwork: String { ["TabShotLog", "TabCut", "TabArchive", "TabProfile"][rawValue] }
+    var name: String { ["Videos", "Tools", "Files", "Me"][rawValue] }
+    var artwork: String { ["GlyphFeed", "GlyphEdit", "GlyphFolder", "GlyphSettings"][rawValue] }
     var identifier: String { "tab.\(name.lowercased())" }
 }
 
@@ -118,6 +118,7 @@ private struct SwevoTabItem: View {
         } icon: {
             Image(tab.artwork).renderingMode(.template)
         }
+        .accessibilityIdentifier(tab.identifier)
     }
 }
 
@@ -143,7 +144,7 @@ private struct SwevoTabDock: View {
                 Button { selection = tab } label: {
                     VStack(spacing: 3) {
                         TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.accent : SwevoStyle.paper)
-                            .frame(width: 26, height: 26)
+                            .frame(width: 22, height: 22)
                         LocalizedText(tab.name)
                             .font(.capture(.caption2, weight: selected ? .semibold : .medium))
                             .multilineTextAlignment(.center)
@@ -155,10 +156,11 @@ private struct SwevoTabDock: View {
                     .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
                     .background {
                         if selected {
-                            RoundedRectangle(cornerRadius: 17)
-                                .fill(SwevoStyle.accent.opacity(0.16))
-                                .strokeBorder(SwevoStyle.accent.opacity(0.35))
+                            let shape = RoundedRectangle(cornerRadius: 17)
+                            shape.fill(SwevoStyle.accent.opacity(0.16))
+                                .overlay { shape.strokeBorder(SwevoStyle.accent.opacity(0.35)) }
                                 .matchedGeometryEffect(id: "selected-tab", in: highlight)
+                                .transition(.identity)
                                 .allowsHitTesting(false)
                         }
                     }
@@ -179,6 +181,11 @@ private struct SwevoTabDock: View {
     }
 }
 
+private struct EditorPresentation: Identifiable {
+    let id = UUID()
+    let movie: PracticeRecording?
+}
+
 struct SwevoRootView: View {
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var library: LibraryStore
@@ -188,35 +195,52 @@ struct SwevoRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.self) private var environment
     @SceneStorage("root.tab") private var tab: SwevoTab = .home
-    @State private var editing: PracticeRecording?
-    @SceneStorage("home.linkDraft") private var linkDraft = ""
-    @State private var libraryFilter = "Saved"
+    @State private var editing: EditorPresentation?
+    @State private var importing = false
+    @State private var libraryFilter = "Imports"
+    @State private var showingLearning = false
     @State private var showingLessons = false
-    @FocusState private var linkFocused: Bool
+    @State private var returnToLessonEntry = false
     var body: some View {
         GeometryReader { container in
             let nativeBar = usesNativeTabBar(in: container)
             TabView(selection: $tab) {
-                HomeView(openAccount: { tab = .me }, discover: { showingLessons = true },
-                         openTools: { tab = .tools }, link: $linkDraft, linkFocus: $linkFocused)
+                HomeView(importing: $importing, edit: { editing = EditorPresentation(movie: $0) }, openLibrary: {
+                    libraryFilter = "Imports"
+                    tab = .library
+                }, openLearning: { showingLearning = true })
                     .swevoTab(.home, nativeBar: nativeBar)
                 ToolsView().swevoTab(.tools, nativeBar: nativeBar)
-                LibraryView(edit: { editing = $0 }, filter: $libraryFilter).swevoTab(.library, nativeBar: nativeBar)
+                LibraryView(edit: { editing = EditorPresentation(movie: $0) },
+                            watchTutorials: { showingLessons = true },
+                            openEditor: { editing = EditorPresentation(movie: nil) },
+                            filter: $libraryFilter, importing: $importing)
+                    .swevoTab(.library, nativeBar: nativeBar)
                 AccountView().swevoTab(.me, nativeBar: nativeBar)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if !nativeBar, !linkFocused {
+                if !nativeBar {
                     SwevoTabDock(selection: $tab)
                 }
             }
+            .disabled(importing)
         }
-        .tint(SwevoStyle.accent)
-        .foregroundStyle(SwevoStyle.paper)
-        .onChange(of: tab) { _, selection in
-            if selection != .home { linkFocused = false }
-        }
-            .sheet(item: $editing) { EditorSheet(initialMovie: $0) }
-            .fullScreenCover(isPresented: $showingLessons) { DiscoverView(canDismiss: true) }
+            .tint(SwevoStyle.accent)
+            .foregroundStyle(SwevoStyle.paper)
+            .sheet(item: $editing) { EditorSheet(initialMovie: $0.movie) }
+            .sheet(isPresented: $showingLearning) { LearningView() }
+            .fullScreenCover(isPresented: $showingLessons, onDismiss: {
+                if returnToLessonEntry {
+                    returnToLessonEntry = false
+                    tab = .home
+                    showingLearning = true
+                }
+            }) {
+                DiscoverView(canDismiss: true, openLessonEntry: {
+                    returnToLessonEntry = true
+                    showingLessons = false
+                })
+            }
             .overlay(alignment: .top) {
                 if !showingLessons { DownloadCompletionNotice().padding(.top, 8) }
             }
@@ -224,7 +248,7 @@ struct SwevoRootView: View {
                 guard library.downloadsRequest != nil else { return }
                 // Full-screen players dismiss first; then move the underlying tab.
                 do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
-                editing = nil
+                showingLearning = false
                 libraryFilter = "Downloads"
                 tab = .library
             }
@@ -256,26 +280,25 @@ struct SwevoRootView: View {
         let height = min(84, container.size.height)
         let dock = CGRect(x: (container.size.width - width) / 2, y: container.size.height - height,
                           width: width, height: height)
-        let regions = container.reservedRegions(kind: .division) + container.reservedRegions(kind: .occlusion)
-        return regions.contains { $0.isActive && dock.intersects($0.frame) }
+        return SwevoStyle.intersectsReservedRegion(dock, in: container)
     }
 }
 
 // A network recovery surface, not a second login or consent gate.
 struct ConnectionPanel: View {
     @EnvironmentObject private var api: APIClient
+    var loadingTitle = "Connecting to Swevo…"
     @State private var error: String?
     @State private var connecting = false
     @State private var attempt = 0
 
     var body: some View {
         VStack(spacing: 24) {
-            CaptureArtwork(kind: .studio, height: 170)
             if let error {
-                MessagePanel(title: "Let’s reconnect.", message: error)
+                MessagePanel(title: "Couldn’t connect to Swevo", message: error)
                 ActionButton(title: "Try again", busy: connecting) { attempt += 1 }
             } else {
-                AccountLoadingIndicator(title: "Setting up your practice room…")
+                AccountLoadingIndicator(title: loadingTitle)
             }
             PolicyLinks()
         }

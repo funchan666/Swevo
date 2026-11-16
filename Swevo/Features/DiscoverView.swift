@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 
 struct BrowserLessonSearch: Identifiable, Equatable {
@@ -28,6 +29,7 @@ final class FeedStore: ObservableObject {
     private var requestQuery = ""
     private(set) var query = ""
     private var generation = UUID()
+    private let diagnostics = Logger(subsystem: "app.swevo", category: "LessonFeed")
 
     init(seed: [LessonClip] = []) {
         entries = seed.map { PlaybackQueueEntry(id: $0.id, clip: $0) }
@@ -57,6 +59,7 @@ final class FeedStore: ObservableObject {
         error = nil
         defer { if generation == current { loading = false } }
         do {
+            var sawInvalidMedia = false
             // Skip a few duplicate/invalid pages, but never spin on an empty service.
             for _ in 0..<3 {
                 if !hasMore {
@@ -70,7 +73,13 @@ final class FeedStore: ObservableObject {
                 let response = try await api.feed(query: requestQuery, feedID: feedID, cursor: cursor)
                 try Task.checkCancellation()
                 guard current == generation else { return }
-                let additions = response.list.compactMap(\.clip).filter { roundVideoIDs.insert($0.id).inserted }
+                let playable = response.list.compactMap(\.clip)
+                let rejected = response.list.count - playable.count
+                if rejected > 0 {
+                    sawInvalidMedia = true
+                    diagnostics.notice("Lesson feed discarded \(rejected) rows with missing IDs or unusable media addresses")
+                }
+                let additions = playable.filter { roundVideoIDs.insert($0.id).inserted }
                     .map { PlaybackQueueEntry(id: UUID().uuidString, clip: $0) }
                 feedID = response.feedId?.nilIfBlank
                 cursor = response.nextCursor?.nilIfBlank
@@ -78,14 +87,16 @@ final class FeedStore: ObservableObject {
                 if !additions.isEmpty { entries += additions; return }
                 if response.list.isEmpty {
                     hasMore = false
-                    if entries.isEmpty, requestQuery.nilIfBlank != nil {
-                        emptySearch = BrowserLessonSearch(query: requestQuery)
-                    }
                     break
                 }
             }
-            if entries.isEmpty, requestQuery.nilIfBlank != nil {
-                emptySearch = BrowserLessonSearch(query: requestQuery)
+            if entries.isEmpty {
+                if sawInvalidMedia {
+                    error = query.nilIfBlank == nil ? "No playable videos were returned. Try again."
+                                                  : "The lesson source returned no playable video. Check the link or try again."
+                } else if requestQuery.nilIfBlank != nil {
+                    emptySearch = BrowserLessonSearch(query: requestQuery)
+                }
             }
             if !entries.isEmpty { error = "No more lessons are available right now. Try again." }
         } catch is CancellationError {
@@ -100,6 +111,7 @@ struct DiscoverView: View {
     @Environment(\.dismiss) private var dismiss
     private let canDismiss: Bool
     private let onExit: (() -> Void)?
+    private let openLessonEntry: (() -> Void)?
     private let onSearchResult: ((String, LessonClip) -> Void)?
     @EnvironmentObject private var offline: OfflineStore
     private var displayEntries: [PlaybackQueueEntry] {
@@ -116,42 +128,20 @@ struct DiscoverView: View {
     @State private var recordedQuery: String?
     @State private var openedBrowserSearchID: UUID?
     @State private var browserSearch: PolicyDocument?
+    @State private var loadedUserID: String?
     init(initialSearch: String = "", canDismiss: Bool = false, onExit: (() -> Void)? = nil,
+         openLessonEntry: (() -> Void)? = nil,
          onSearchResult: ((String, LessonClip) -> Void)? = nil) {
         self.canDismiss = canDismiss
         self.onExit = onExit
+        self.openLessonEntry = openLessonEntry
         self.onSearchResult = onSearchResult
         _search = State(initialValue: initialSearch)
     }
     var body: some View {
         ZStack(alignment: .top) {
-            if api.session == nil {
-                VStack(spacing: 0) {
-                    feedHeader
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            CaptureArtwork(kind: .lesson, height: 208)
-                            LocalizedText("Connecting your lesson feed…")
-                                .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                            ConnectionPanel()
-                        }.swevoPage()
-                    }
-                }
-            } else if feed.clips.isEmpty {
-                VStack(spacing: 0) {
-                    feedHeader
-                    ScrollView {
-                        VStack(spacing: 24) {
-                            CaptureArtwork(kind: .lesson, height: 208)
-                            MessagePanel(title: feed.loading ? "Finding your next lesson…" : "Your next session starts here.",
-                                         message: feed.error ?? (feed.loading ? "Loading your lesson feed." : feed.emptySearch != nil ? "No matching lessons. Search the web with your original input." : "No lessons are available here yet. Try another search or open a shared lesson link on Home."),
-                                         actionTitle: feed.loading ? nil : feed.emptySearch != nil ? "Search in browser" : "Try again") {
-                                if let request = feed.emptySearch { openBrowserSearch(request) }
-                                else { Task { await feed.load(api: api, search: search) } }
-                            }
-                        }.swevoPage()
-                    }
-                }
+            if api.session == nil || feed.entries.isEmpty {
+                lessonStatusPage
             } else {
                 GeometryReader { container in
                     GeometryReader { geometry in
@@ -173,8 +163,10 @@ struct DiscoverView: View {
                                 }
                                 if !feed.entries.isEmpty {
                                     VStack(spacing: 16) {
-                                        LocalizedText(feed.error ?? "Finding more clips…").foregroundStyle(SwevoStyle.secondary)
-                                        ActionButton(title: "Load more", primary: false, busy: feed.loading) { Task { await feed.load(api: api) } }
+                                        if let error = feed.error { ErrorNote(message: error) }
+                                        ActionButton(title: feed.loading ? "Loading lessons…" : feed.error == nil ? "Load more" : "Try again",
+                                                     primary: false) { Task { await feed.load(api: api) } }
+                                            .disabled(feed.loading)
                                     }.padding(28).padding(container.safeAreaInsets)
                                         .frame(width: geometry.size.width, height: geometry.size.height).id(morePageID)
                                 }
@@ -186,9 +178,7 @@ struct DiscoverView: View {
                     }.ignoresSafeArea(.container, edges: .all)
                 }
             }
-            if api.session != nil, !feed.clips.isEmpty {
-                feedHeader
-            }
+            feedHeader
         }.swevoScreenBackground(.black)
             .modifier(PlayerPagingAccess(entries: displayEntries, selectedID: $activeID, tailID: morePageID, players: players))
             .overlay(alignment: .top) { DownloadCompletionNotice().padding(.top, 56) }
@@ -196,12 +186,7 @@ struct DiscoverView: View {
                 if request != nil { players.releaseAll(); if canDismiss { dismiss() } }
             }
             .onAppear { visible = true; players.update(entries: displayEntries, selectedID: activeID) }
-            .task(id: api.session?.userId.value) {
-                guard api.session != nil else { return }
-                await feed.load(api: api, search: search)
-                guard !Task.isCancelled else { return }
-                activeID = feed.entries.first?.id
-            }
+            .task(id: api.session?.userId.value) { await loadInitialFeed() }
             .onChange(of: activeID) { _, id in
                 guard visible, api.session != nil,
                       id == morePageID || feed.isNearEnd(id) else { return }
@@ -229,6 +214,68 @@ struct DiscoverView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in players.trimMemory() }
     }
+
+    private var lessonStatusPage: some View {
+        let ready = loadedUserID != nil && loadedUserID == api.session?.userId.value
+        let empty = ready && !feed.loading && feed.error == nil
+        let noResultsTitle = feed.emptySearch != nil ? "No matching lessons" : "No lessons available"
+        let pageTitle = search.nilIfBlank == nil ? "Watch tutorials" : "Lesson search"
+        return ScenePage(artwork: empty ? "EmptyLessons" : "SceneLessons", depth: 128,
+                         openingGap: 0, artworkOpacity: 0.50) { _ in
+            SceneTitle(empty ? noResultsTitle : pageTitle, size: 34)
+                .padding(.trailing, 50)
+        } content: { _ in
+            if api.session == nil {
+                ConnectionPanel(loadingTitle: "Connecting your lesson feed…")
+            } else if feed.loading || !ready {
+                HStack(spacing: 12) {
+                    ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
+                    LocalizedText(search.nilIfBlank == nil ? "Loading lessons…" : "Searching for lessons…")
+                        .font(.capture(.subheadline))
+                }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            } else if let error = feed.error {
+                VStack(alignment: .leading, spacing: 12) {
+                    MessagePanel(title: "Couldn’t load lessons", message: error, actionTitle: "Try again") {
+                        Task { await loadInitialFeed() }
+                    }
+                    if search.nilIfBlank != nil, let openLessonEntry {
+                        EmptyStateAction(title: "Use a link or code", symbol: .link, action: openLessonEntry)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let request = feed.emptySearch {
+                        EmptyStateCopy(message: "Search the web with the link or code you entered.")
+                        EmptyStateAction(title: "Search in browser", symbol: .search) { openBrowserSearch(request) }
+                    } else {
+                        EmptyStateAction(title: "Try again", symbol: .feed) {
+                            Task { await loadInitialFeed() }
+                        }
+                        if let openLessonEntry {
+                            Button(action: openLessonEntry) {
+                                LocalizedText("Use a link or code")
+                                    .font(.capture(.subheadline, weight: .semibold))
+                                    .foregroundStyle(SwevoStyle.accent)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }.buttonStyle(PressStyle())
+                        }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func loadInitialFeed() async {
+        loadedUserID = nil
+        guard let userID = api.session?.userId.value else { return }
+        await feed.load(api: api, search: search)
+        guard !Task.isCancelled, api.session?.userId.value == userID else { return }
+        loadedUserID = userID
+        activeID = feed.entries.first?.id
+    }
+
     private func openPendingBrowserSearch() {
         guard visible, scenePhase == .active, let request = feed.emptySearch,
               openedBrowserSearchID != request.id else { return }
@@ -297,10 +344,12 @@ struct PlayerScreen: View {
                         }
                         if route.continuesRecommendations {
                             VStack(spacing: 16) {
-                                LocalizedText(feed.error ?? "Finding more clips…")
-                                ActionButton(title: "Load more", primary: false, busy: feed.loading) {
+                                if let error = feed.error { ErrorNote(message: error) }
+                                ActionButton(title: feed.loading ? "Loading lessons…" : feed.error == nil ? "Load more" : "Try again",
+                                             primary: false) {
                                     Task { await feed.load(api: api) }
                                 }
+                                .disabled(feed.loading)
                             }.padding(28).padding(container.safeAreaInsets)
                                 .containerRelativeFrame([.horizontal, .vertical]).id(morePageID)
                         }
@@ -585,13 +634,15 @@ struct ClipPage: View {
                 .padding(.trailing, controlInsets.trailing + 72)
             if active, visible, !pagingGate, !gate, !options, !editor, !downloadPanel, !downloadReward {
                 if accessChecked, !allowed {
+                    let limitReached = quota.canRequestReward(for: .watch, premium: commerce.premium)
                     VStack(spacing: 16) {
-                        LocalizedText("Keep watching").font(.capture(.title3, weight: .semibold))
-                        ActionButton(title: "Get more views") { gate = true }
+                        LocalizedText(limitReached ? "Daily view limit reached" : "Playback unavailable")
+                            .font(.capture(.title3, weight: .semibold))
+                        ActionButton(title: limitReached ? "Get more views" : "View membership") { gate = true }
                     }.padding(20).frame(maxWidth: 320)
                         .background { CaptureSurface(tone: .plum) }.padding(24)
                 } else if let error = playback.error {
-                    MessagePanel(title: "This clip couldn’t load", message: error, actionTitle: "Retry") { activate(reload: true) }.padding(24)
+                    MessagePanel(title: "Couldn’t load video", message: error, actionTitle: "Try again") { activate(reload: true) }.padding(24)
                 } else if allowed, playback.isLoading || (!firstFrameReady && playback.intendsPlayback) {
                     PlayerLoadingFeedback(buffering: firstFrameReady)
                         .allowsHitTesting(false)
@@ -609,6 +660,7 @@ struct ClipPage: View {
             .onChange(of: playback.isPlaying) { _, playing in
                 if playing, active, visible, !recorded {
                     recorded = clip.playbackURL.isFileURL || quota.recordWatch(clip.id, premium: commerce.premium)
+                    if clip.playbackURL.isFileURL { offline.markOpened(clip.id) }
                     if !recorded { playback.pause(); allowed = false }
                 }
                 if playing, active, recorded { didStartPlaying() }
@@ -701,8 +753,8 @@ struct ClipPage: View {
                 .padding(.bottom, 8)
                 rail {
                     PlayerRailButton(artwork: library.isSaved(clip) ? .saved : .save,
-                                     title: library.isSaved(clip) ? "Favorited" : "Favorite",
-                                     accessibilityTitle: library.isSaved(clip) ? "Remove saved video" : "Save video",
+                                     title: library.isSaved(clip) ? "Saved" : "Save",
+                                     accessibilityTitle: library.isSaved(clip) ? "Remove from favorites" : "Save to favorites",
                                      selected: library.isSaved(clip), action: save)
                     PlayerCacheButton(clip: clip, action: cacheVideo)
                     PlayerRailButton(artwork: .more, title: "More", accessibilityTitle: "Playback options") {
@@ -862,12 +914,12 @@ private struct PlayerCacheButton: View {
                 else { LocalizedText("Download") }
             }
         }.buttonStyle(PressStyle())
-            .accessibilityLabel(LocalizedStringKey(cached ? "Available offline" : "Download for offline"))
+            .accessibilityLabel(LocalizedStringKey(cached ? "Available offline" : "Download for offline viewing"))
             .accessibilityIdentifier("player.cacheVideo")
     }
 }
 
-private struct PlayerProgressControl: View {
+struct PlayerProgressControl: View {
     @ObservedObject var playback: PlaybackController
     @ObservedObject var timeline: PlaybackTimeline
     let enabled: Bool
@@ -883,12 +935,12 @@ private struct PlayerProgressControl: View {
                     // During a drag, move the UI only. Seek once on release.
                     if !scrubbing { playback.seek($0) }
                 }
-            ), range: 0...max(1, timeline.duration), label: "Playback position",
+            ), range: 0...max(0.01, timeline.duration), label: "Playback position",
                          tint: .white, trackHeight: scrubbing ? 5 : 2,
                          onEditingChanged: { editing in
                 if editing {
                     scrubPosition = timeline.elapsed
-                    resumeAfterScrub = playback.isPlaying
+                    resumeAfterScrub = playback.intendsPlayback
                     scrubbing = true
                     playback.pause()
                 } else {

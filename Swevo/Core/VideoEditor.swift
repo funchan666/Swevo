@@ -23,6 +23,16 @@ struct EditRecipe: Equatable {
     var quality: ExportQuality = .full
 }
 
+func editableVideoDuration(for asset: AVURLAsset) async throws -> Double {
+    let duration = try await asset.load(.duration).seconds
+    let playable = try await asset.load(.isPlayable)
+    let tracks = try await asset.loadTracks(withMediaType: .video)
+    guard playable, duration.isFinite, duration > 0.1, !tracks.isEmpty else {
+        throw SwevoError.unsupportedMedia
+    }
+    return duration
+}
+
 @MainActor
 final class VideoEditor: ObservableObject {
     @Published var recipe = EditRecipe()
@@ -43,7 +53,7 @@ final class VideoEditor: ObservableObject {
     private var previewURL: URL?
     private var previewRevision = UUID()
 
-    func open(_ url: URL) async {
+    func open(_ url: URL, onReady: () -> Void) async {
         clearRenderedPreview()
         let requestID = UUID()
         revision = requestID
@@ -56,16 +66,20 @@ final class VideoEditor: ObservableObject {
         thumbnails = []
         preview.release()
         do {
+            guard FileManager.default.isReadableFile(atPath: url.path) else {
+                throw SwevoError.service("This file can’t be read. Choose the video again from Files.")
+            }
             let asset = AVURLAsset(url: url)
-            let duration = try await asset.load(.duration).seconds
-            let playable = try await asset.load(.isPlayable)
-            let tracks = try await asset.loadTracks(withMediaType: .video)
-            guard playable, duration.isFinite, duration > 0.1, !tracks.isEmpty else { throw SwevoError.unsupportedMedia }
+            let duration = try await editableVideoDuration(for: asset)
+            try Task.checkCancellation()
             guard revision == requestID else { return }
             self.duration = duration
             recipe = EditRecipe(start: 0, end: duration)
+            preview.setSpeed(1)
+            preview.setMuted(false)
             preview.load(url, autoplay: false)
             isLoading = false
+            onReady()
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 180, height: 180)
@@ -77,12 +91,27 @@ final class VideoEditor: ObservableObject {
                     thumbnails.append(UIImage(cgImage: result.image))
                 }
             }
+        } catch is CancellationError {
+            if revision == requestID { isLoading = false }
         } catch {
             guard revision == requestID else { return }
             self.error = error.localizedDescription
             sourceURL = nil
             isLoading = false
         }
+    }
+
+    func retryPlayback() {
+        guard let url = previewURL ?? sourceURL else { return }
+        preview.load(url, autoplay: true)
+    }
+
+    func restoreSourcePreview(seekTo time: Double) {
+        if previewURL != nil {
+            clearRenderedPreview()
+            if let sourceURL { preview.load(sourceURL, autoplay: false) }
+        }
+        preview.seek(time)
     }
 
     func applyPreview() async {

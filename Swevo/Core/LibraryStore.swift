@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import Combine
 import CoreTransferable
 import UniformTypeIdentifiers
@@ -27,9 +28,17 @@ final class LibraryStore: ObservableObject {
         }
     }
     var movies: [PracticeRecording] { snapshot.movies }
+    var importedMovies: [PracticeRecording] { movies.filter { !$0.isExport } }
     var favorites: [LessonClip] { snapshot.favorites }
     var history: [LessonLinkVisit] { snapshot.history }
     func url(for movie: PracticeRecording) -> URL { root.appendingPathComponent(movie.filename) }
+
+    func markOpened(_ movie: PracticeRecording) {
+        guard let index = snapshot.movies.firstIndex(where: { $0.id == movie.id }) else { return }
+        var next = snapshot
+        next.movies[index].lastOpenedAt = Date()
+        save(next)
+    }
     // Internal IDs stay stable; only the user-facing shared copy gets a readable name.
     func shareFile(for movie: PracticeRecording, commerce: CommerceStore) async throws -> URL {
         try commerce.requireMediaExport()
@@ -113,12 +122,25 @@ final class LibraryStore: ObservableObject {
         try await Task.detached(priority: .userInitiated) {
             let access = source.startAccessingSecurityScopedResource()
             defer { if access { source.stopAccessingSecurityScopedResource() } }
-            try FileManager.default.copyItem(at: source, to: destination)
+            do {
+                try FileManager.default.copyItem(at: source, to: destination)
+            } catch {
+                try? FileManager.default.removeItem(at: destination)
+                throw error
+            }
         }.value
-        var next = snapshot
-        next.movies.insert(item, at: 0)
-        do { try persist(next) }
-        catch { try? FileManager.default.removeItem(at: destination); throw error }
+        do {
+            if !exported {
+                _ = try await editableVideoDuration(for: AVURLAsset(url: destination))
+            }
+            try Task.checkCancellation()
+            var next = snapshot
+            next.movies.insert(item, at: 0)
+            try persist(next)
+        } catch {
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
         return item
     }
     func delete(_ movie: PracticeRecording) {
@@ -146,13 +168,15 @@ final class LibraryStore: ObservableObject {
 
 struct ImportedMovie: Transferable {
     let url: URL
+    let suggestedTitle: String?
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(contentType: .movie) { movie in SentTransferredFile(movie.url) }
         importing: { received in
             let ext = received.file.pathExtension.nilIfBlank ?? "mov"
             let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
             try FileManager.default.copyItem(at: received.file, to: copy)
-            return ImportedMovie(url: copy)
+            let name = received.file.deletingPathExtension().lastPathComponent
+            return ImportedMovie(url: copy, suggestedTitle: UUID(uuidString: name) == nil ? name.nilIfBlank : nil)
         }
     }
 }

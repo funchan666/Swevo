@@ -40,7 +40,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Save the camera take you choose to export to your photo library.</string>
+	<string>Save the video you choose to export to your photo library.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

@@ -2,9 +2,9 @@ import SwiftUI
 import UIKit
 
 enum SwevoStyle {
-    static let background = Color(red: 0.090, green: 0.078, blue: 0.098)
-    static let surface = Color(red: 0.144, green: 0.117, blue: 0.153)
-    static let raised = Color(red: 0.211, green: 0.168, blue: 0.220)
+    static let background = Color(red: 0.084, green: 0.083, blue: 0.093)
+    static let surface = Color(red: 0.124, green: 0.121, blue: 0.135)
+    static let raised = Color(red: 0.180, green: 0.173, blue: 0.191)
     static let accent = Color(red: 1, green: 0.769, blue: 0.624)
     static let ink = Color(red: 0.133, green: 0.086, blue: 0.122)
     static let secondary = Color(red: 0.800, green: 0.749, blue: 0.776)
@@ -13,6 +13,21 @@ enum SwevoStyle {
     static let mist = Color(red: 0.929, green: 0.831, blue: 0.828)
     static let line = paper.opacity(0.14)
     static let danger = Color(red: 1, green: 0.650, blue: 0.670)
+    static let pageMargin: CGFloat = 20
+
+    static func pageContentWidth(in container: GeometryProxy) -> CGFloat {
+        if #available(iOS 27.1, *) {
+            let margins = container.contentMargins(for: .container, edges: .horizontal)
+            return max(0, container.size.width - margins.leading - margins.trailing)
+        }
+        return max(0, container.size.width - pageMargin * 2)
+    }
+
+    static func intersectsReservedRegion(_ frame: CGRect, in container: GeometryProxy) -> Bool {
+        guard #available(iOS 27.1, *) else { return false }
+        let regions = container.reservedRegions(kind: .division) + container.reservedRegions(kind: .occlusion)
+        return regions.contains { $0.isActive && frame.intersects($0.frame) }
+    }
 }
 
 // MARK: - Original raster artwork (Asset Catalog). Missing art never blocks layout or touch.
@@ -27,62 +42,36 @@ enum ArtworkCatalog {
     }
 }
 
-/// Square spot illustrations for empty states, sheets and cards.
-struct CaptureArtwork: View {
-    enum Kind: String { case studio = "ArtStudio", lesson = "ArtLesson", pass = "ArtPass", notebook = "ArtNotebook" }
-    let kind: Kind
-    var height: CGFloat = 160
-    var body: some View {
-        Group {
-            if ArtworkCatalog.has(kind.rawValue) {
-                Image(kind.rawValue).renderingMode(.original).resizable().interpolation(.high).scaledToFit()
-            } else { Color.clear }
-        }
-        .frame(width: height, height: height)
-        .frame(maxWidth: .infinity)
-        .allowsHitTesting(false).accessibilityHidden(true)
-    }
-}
-
-/// Editorial covers for the guide and practice tools.
-struct GuideArtwork: View {
-    enum Subject: String {
-        case steady = "GuideSteady"
-        case track = "GuideTrack"
-        case reveal = "GuideReveal"
-        case parallax = "GuideParallax"
-        case focus = "GuideFocus"
-        case setup = "GuideSetup"
-        case review = "ToolReview", speed = "ToolSpeed", frame = "ToolFrame", audio = "ToolAudio"
-    }
-    let subject: Subject
-    var body: some View {
-        SwevoStyle.raised.overlay {
-            if ArtworkCatalog.has(subject.rawValue) {
-                Image(subject.rawValue).renderingMode(.original).resizable().interpolation(.high).scaledToFill()
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .allowsHitTesting(false).accessibilityHidden(true)
-    }
-}
-
 struct SceneArtwork: View {
     let name: String
 
     var body: some View {
         GeometryReader { geometry in
-            Image(name).resizable().interpolation(.high).scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
+            let subjectWidth = geometry.size.height * 1.5
+            if geometry.size.width > geometry.size.height * 1.85 {
+                ZStack {
+                    SceneImage(name: name).blur(radius: 22).opacity(0.55)
+                    SceneImage(name: name).frame(width: subjectWidth)
+                        .mask {
+                            LinearGradient(stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black, location: 0.14),
+                                .init(color: .black, location: 0.86),
+                                .init(color: .clear, location: 1)
+                            ], startPoint: .leading, endPoint: .trailing)
+                        }
+                }
+            } else {
+                SceneImage(name: name)
+            }
         }
-        .background(SwevoStyle.background)
+        .clipped()
         .overlay {
             LinearGradient(stops: [
-                .init(color: SwevoStyle.background.opacity(0.70), location: 0),
+                .init(color: SwevoStyle.background.opacity(0.82), location: 0),
                 .init(color: .clear, location: 0.24),
                 .init(color: .clear, location: 0.46),
-                .init(color: SwevoStyle.background.opacity(0.75), location: 0.76),
+                .init(color: SwevoStyle.background.opacity(0.82), location: 0.76),
                 .init(color: SwevoStyle.background, location: 1)
             ], startPoint: .top, endPoint: .bottom)
         }
@@ -92,17 +81,45 @@ struct SceneArtwork: View {
     }
 }
 
+struct SceneImage: View {
+    let name: String
+
+    var body: some View {
+        GeometryReader { geometry in
+            Image(name).resizable().interpolation(.high).scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+        }
+        .background(SwevoStyle.background)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct ScenePage<Opening: View, PageContent: View>: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    let artwork: String
+    let artwork: String?
+    let artworkOpacity: Double
     let depth: CGFloat
-    @ViewBuilder let opening: (CGFloat) -> Opening
-    @ViewBuilder let content: (GeometryProxy) -> PageContent
+    let openingGap: CGFloat
+    let opening: (CGFloat) -> Opening
+    let content: (GeometryProxy) -> PageContent
+
+    init(artwork: String?, depth: CGFloat, openingGap: CGFloat = 16, artworkOpacity: Double = 1,
+         @ViewBuilder opening: @escaping (CGFloat) -> Opening,
+         @ViewBuilder content: @escaping (GeometryProxy) -> PageContent) {
+        self.artwork = artwork
+        self.artworkOpacity = artworkOpacity
+        self.depth = depth
+        self.openingGap = openingGap
+        self.opening = opening
+        self.content = content
+    }
 
     var body: some View {
         GeometryReader { container in
-            let widthAdjustment = min(72, max(-32, (container.size.width - 390) * 0.22))
-            let height = verticalSizeClass == .compact ? min(depth, 178) : depth + widthAdjustment
+            let widthAdjustment = artwork == nil ? 0 : min(72, max(-32, (container.size.width - 390) * 0.22))
+            let height = verticalSizeClass == .compact ? min(depth, 178) : max(44, depth + widthAdjustment)
             ScrollView {
                 VStack(spacing: 0) {
                     opening(height)
@@ -111,8 +128,10 @@ struct ScenePage<Opening: View, PageContent: View>: View {
                         .frame(maxWidth: 680)
                         .frame(maxWidth: .infinity)
                         .padding(.top, container.safeAreaInsets.top + 10)
-                        .padding(.bottom, 16)
-                        .background { SceneArtwork(name: artwork) }
+                        .padding(.bottom, openingGap)
+                        .background {
+                            if let artwork { SceneArtwork(name: artwork).opacity(artworkOpacity) }
+                        }
                     content(container).swevoPage()
                 }
             }
@@ -239,6 +258,48 @@ struct ActionButton: View {
         }.buttonStyle(PressStyle()).disabled(busy)
     }
 }
+
+struct EmptyStateCopy: View {
+    var title: String? = nil
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            if let title { SceneTitle(title, size: 30) }
+            LocalizedText(message)
+                .font(.capture(.body))
+                .foregroundStyle(SwevoStyle.secondary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 440, alignment: .leading)
+    }
+}
+
+struct EmptyStateAction: View {
+    let title: String
+    let symbol: SwevoGlyph
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Glyph(symbol: symbol, size: 18, tint: SwevoStyle.accent)
+                LocalizedText(title)
+                    .font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+            .frame(minHeight: 48)
+            .foregroundStyle(SwevoStyle.paper)
+            .swevoGlass()
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(PressStyle())
+    }
+}
+
 struct MessagePanel: View {
     let title: String
     let message: String
@@ -316,12 +377,13 @@ extension View {
         pageHorizontalMargins().padding(.top, 16).padding(.bottom, 24)
             .frame(maxWidth: 680).frame(maxWidth: .infinity, alignment: .top)
     }
+
     @ViewBuilder
     func pageHorizontalMargins() -> some View {
         if #available(iOS 27.1, *) {
             contentMargins(for: .container, edges: .horizontal)
         } else {
-            padding(.horizontal, 20)
+            padding(.horizontal, SwevoStyle.pageMargin)
         }
     }
 
@@ -329,11 +391,14 @@ extension View {
         modifier(SwevoGlass(cornerRadius: cornerRadius))
     }
 
-    func sceneClose(disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        overlay(alignment: .topTrailing) {
-            IconButton(symbol: .close, label: "Close", action: action)
+    func sceneDismiss(symbol: SwevoGlyph = .close, label: String = "Close", edge: HorizontalEdge = .trailing,
+                      disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        overlay(alignment: .top) {
+            IconButton(symbol: symbol, label: label, action: action)
                 .swevoGlass(cornerRadius: 22)
                 .disabled(disabled)
+                .accessibilitySortPriority(1)
+                .frame(maxWidth: .infinity, alignment: edge == .leading ? .leading : .trailing)
                 .pageHorizontalMargins()
                 .padding(.top, 8)
         }
@@ -429,16 +494,15 @@ struct FeatureRow: View {
     let detail: String
     var body: some View {
         HStack(spacing: 16) {
-            Glyph(symbol: symbol, size: 22)
-                .frame(width: 48, height: 48)
-                .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            Glyph(symbol: symbol, size: 20, tint: SwevoStyle.accent)
+                .frame(width: 32)
             VStack(alignment: .leading, spacing: 4) {
                 LocalizedText(title).font(.capture(.subheadline, weight: .semibold)).foregroundStyle(SwevoStyle.paper)
                 LocalizedText(detail).font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 }
 

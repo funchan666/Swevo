@@ -54,11 +54,13 @@ final class CommerceStore: NSObject, ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var refreshingOwner: String?
     var premium: Bool { expiration.map { $0 > Date() } ?? false }
-    var canExportMedia: Bool {
-        rightsVerified && premium && ownerID != nil && ownerID == api.session?.userId.value
+    private var verifiedCurrentAccount: Bool {
+        rightsVerified && ownerID != nil && ownerID == api.session?.userId.value
     }
+    var hasVerifiedPlus: Bool { verifiedCurrentAccount && premium }
+    var canExportMedia: Bool { hasVerifiedPlus }
     func requireMediaExport() throws {
-        guard rightsVerified, ownerID != nil, ownerID == api.session?.userId.value else {
+        guard verifiedCurrentAccount else {
             throw SwevoError.service("Connect to verify your Plus membership before exporting.")
         }
         guard premium else { throw SwevoError.service("Export is included with Plus.") }

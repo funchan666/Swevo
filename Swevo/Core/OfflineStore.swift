@@ -41,10 +41,21 @@ struct OfflineVideo: Codable, Identifiable {
     // AVFoundation owns HLS storage. Its file URL need not be inside our home
     // directory. Older indexes only contain relativePath and remain readable.
     var systemAssetURL: URL? = nil
+    var lastOpenedAt: Date? = nil
     var id: String { clip.id }
     var url: URL {
         if isHLS, let systemAssetURL, systemAssetURL.isFileURL { return OfflineAssetLocation.restoredHLSURL(systemAssetURL) }
         return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).appendingPathComponent(relativePath)
+    }
+    var hasLocalFile: Bool {
+        guard !relativePath.isEmpty || (isHLS && systemAssetURL?.isFileURL == true) else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+    var displayFilename: String {
+        let title = clip.title
+        let suffix = url.pathExtension
+        guard !suffix.isEmpty, (title as NSString).pathExtension.caseInsensitiveCompare(suffix) != .orderedSame else { return title }
+        return "\(title).\(suffix)"
     }
 }
 
@@ -129,7 +140,15 @@ final class OfflineStore: NSObject, ObservableObject {
         } catch { readable = false; self.error = "Offline downloads could not be read. Existing files have been preserved." }
     }
     func cached(_ id: String) -> OfflineVideo? {
-        videos.first { $0.id == id && $0.owner == api.offlineOwnerID && FileManager.default.fileExists(atPath: $0.url.path) }
+        videos.first { $0.id == id && $0.owner == api.offlineOwnerID && $0.hasLocalFile }
+    }
+    func markOpened(_ id: String) {
+        guard let video = cached(id),
+              let position = index.videos.firstIndex(where: { $0.id == id && $0.owner == video.owner }) else { return }
+        var next = index
+        next.videos[position].lastOpenedAt = Date()
+        do { try persist(next) }
+        catch { error = "Your changes could not be saved on this device. Please try again." }
     }
     func playable(_ clip: LessonClip) -> LessonClip {
         guard let video = cached(clip.id) else { return clip }
@@ -393,7 +412,7 @@ final class OfflineStore: NSObject, ObservableObject {
               transfer.savedURL != nil else { return }
         finalizing = true
         defer { finalizing = false }
-        let video = OfflineVideo(clip: transfer.clip, relativePath: transfer.relativePath ?? "",
+        var video = OfflineVideo(clip: transfer.clip, relativePath: transfer.relativePath ?? "",
                                  isHLS: transfer.isHLS, owner: transfer.owner, systemAssetURL: transfer.systemAssetURL)
         do {
             guard FileManager.default.fileExists(atPath: video.url.path) else { throw SwevoError.storage }
@@ -410,6 +429,7 @@ final class OfflineStore: NSObject, ObservableObject {
             guard index.transfer?.id == transfer.id, transfer.owner == api.session?.userId.value else { return }
             try quota.recordDownload(video.id, owner: transfer.owner, premium: transfer.premium || commerce.premium)
             var next = index
+            video.lastOpenedAt = next.videos.first { $0.id == video.id && $0.owner == video.owner }?.lastOpenedAt
             next.videos.removeAll { $0.id == video.id }
             next.videos.insert(video, at: 0)
             next.transfer = nil
