@@ -31,7 +31,7 @@ struct HomeView: View {
 
     var body: some View {
         let history = videoHistory
-        return ScenePage { container in
+        return ScenePage(reservesTabDockSpace: true) { container in
             let width = min(680, SwevoStyle.pageContentWidth(in: container))
             let bounds = CGRect(origin: .zero, size: container.size)
             let compact = typeSize > .xLarge
@@ -457,7 +457,7 @@ struct CameraMovesView: View {
 
     var body: some View {
         let request = ChannelRequest(links: commerce.release?.lcList?["us"] ?? [], attempt: channelRetry)
-        ScenePage(artwork: "SceneLessons", depth: 224, openingGap: 0) { _ in
+        ScenePage(artwork: "SceneLessons", depth: 224, openingGap: 0, reservesTabDockSpace: true) { _ in
             let headingLayout = typeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
                 : AnyLayout(HStackLayout(alignment: .center, spacing: 12))

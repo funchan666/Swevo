@@ -68,7 +68,7 @@ struct ToolsView: View {
             (first.lastOpenedAt ?? .distantPast, first.date) < (second.lastOpenedAt ?? .distantPast, second.date)
         }
         ScenePage(artwork: movie == nil ? "SceneEdit" : nil, depth: movie == nil ? 168 : 44,
-                  openingGap: 0, artworkOpacity: 0.84) { height in
+                  openingGap: 0, artworkOpacity: 0.84, reservesTabDockSpace: true) { height in
             VStack(alignment: .leading, spacing: 12) {
                 PlusEntryButton(action: openPlus)
                     .frame(maxWidth: .infinity, alignment: .trailing)

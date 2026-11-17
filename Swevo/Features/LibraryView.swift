@@ -86,7 +86,7 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        ScenePage { container in
+        ScenePage(reservesTabDockSpace: true) { container in
             let width = min(640, SwevoStyle.pageContentWidth(in: container))
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             let headerBounds = CGRect(x: 0, y: 0, width: container.size.width, height: 72)

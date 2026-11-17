@@ -97,22 +97,37 @@ struct SceneImage: View {
     }
 }
 
+private enum SwevoTabDockInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var swevoTabDockInset: CGFloat {
+        get { self[SwevoTabDockInsetKey.self] }
+        set { self[SwevoTabDockInsetKey.self] = newValue }
+    }
+}
+
 struct ScenePage<Opening: View, PageContent: View>: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.swevoTabDockInset) private var tabDockInset
     let artwork: String?
     let artworkOpacity: Double
     let depth: CGFloat
     let openingGap: CGFloat
+    let reservesTabDockSpace: Bool
     let opening: (CGFloat) -> Opening
     let content: (GeometryProxy) -> PageContent
 
     init(artwork: String?, depth: CGFloat, openingGap: CGFloat = 16, artworkOpacity: Double = 1,
+         reservesTabDockSpace: Bool = false,
          @ViewBuilder opening: @escaping (CGFloat) -> Opening,
          @ViewBuilder content: @escaping (GeometryProxy) -> PageContent) {
         self.artwork = artwork
         self.artworkOpacity = artworkOpacity
         self.depth = depth
         self.openingGap = openingGap
+        self.reservesTabDockSpace = reservesTabDockSpace
         self.opening = opening
         self.content = content
     }
@@ -136,6 +151,7 @@ struct ScenePage<Opening: View, PageContent: View>: View {
                     content(container).swevoPage()
                         .background { SwevoStyle.background }
                 }
+                .padding(.bottom, reservesTabDockSpace ? tabDockInset : 0)
             }
             .clipped()
             .background(alignment: .top) {
@@ -154,9 +170,10 @@ struct ScenePage<Opening: View, PageContent: View>: View {
 }
 
 extension ScenePage where Opening == EmptyView {
-    init(artwork: String? = nil, depth: CGFloat = 0, artworkOpacity: Double = 1,
+    init(artwork: String? = nil, depth: CGFloat = 0, artworkOpacity: Double = 1, reservesTabDockSpace: Bool = false,
          @ViewBuilder content: @escaping (GeometryProxy) -> PageContent) {
         self.init(artwork: artwork, depth: depth, openingGap: 0, artworkOpacity: artworkOpacity,
+                  reservesTabDockSpace: reservesTabDockSpace,
                   opening: { _ in EmptyView() }, content: content)
     }
 }

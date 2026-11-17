@@ -563,7 +563,7 @@ struct AccountView: View {
     }
 
     var body: some View {
-        ScenePage(artwork: "SceneAccountCover", depth: 176, openingGap: 0) { _ in
+        ScenePage(artwork: "SceneAccountCover", depth: 176, openingGap: 0, reservesTabDockSpace: true) { _ in
             membershipEntry
         } content: { container in
             accountContent(in: container)
