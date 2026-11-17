@@ -2,7 +2,6 @@ import SwiftUI
 import AVFoundation
 
 struct LibraryView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var offline: OfflineStore
     @EnvironmentObject private var commerce: CommerceStore
@@ -10,6 +9,7 @@ struct LibraryView: View {
     var edit: (PracticeRecording) -> Void
     var browseVideos: () -> Void
     var openEditor: () -> Void
+    let openTools: () -> Void
     let openPlus: () -> Void
     @Binding var filter: String
     @Binding var importing: Bool
@@ -90,7 +90,7 @@ struct LibraryView: View {
             let width = min(640, SwevoStyle.pageContentWidth(in: container))
             let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             let headerBounds = CGRect(x: 0, y: 0, width: container.size.width, height: 72)
-            let stackedHeader = width < 332 || typeSize > .xLarge
+            let stackedHeader = width < 352 || typeSize > .xLarge
                 || SwevoStyle.intersectsReservedRegion(headerBounds, in: container)
             VStack(alignment: .leading, spacing: 16) {
                 libraryHeader(stacked: stackedHeader)
@@ -103,6 +103,7 @@ struct LibraryView: View {
         }
             .scrollDismissesKeyboard(.interactively)
             .dismissKeyboardOnOutsideTap($searchFocused, scope: "library-search")
+            .onDisappear { searchFocused = false }
             .onChange(of: filter) { _, _ in endSearch() }
             .onChange(of: library.downloadsRequest) { _, _ in endSearch() }
             .sheet(item: $sharing) { ShareSheet(items: [$0.url]) }
@@ -143,13 +144,7 @@ struct LibraryView: View {
             .fixedSize(horizontal: true, vertical: false)
         return layout {
             HStack(spacing: 8) {
-                IconButton(symbol: .back, label: "Back") {
-                    searchFocused = false
-                    dismiss()
-                }
-                .swevoGlass(cornerRadius: 18)
-                .disabled(importing)
-                .accessibilityIdentifier("library.back")
+                toolsEntry.fixedSize(horizontal: !stacked, vertical: false)
                 if stacked {
                     Spacer(minLength: 0)
                     plus
@@ -160,6 +155,27 @@ struct LibraryView: View {
                 if !stacked { plus }
             }
         }
+    }
+
+    private var toolsEntry: some View {
+        Button {
+            searchFocused = false
+            openTools()
+        } label: {
+            HStack(spacing: 6) {
+                Glyph(symbol: .edit, size: 16, tint: SwevoStyle.accent)
+                LocalizedText("Tools").font(.capture(.footnote, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(SwevoStyle.paper)
+            .swevoGlass(cornerRadius: 13)
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 13))
+        }
+        .buttonStyle(PressStyle())
+        .disabled(importing)
+        .accessibilityIdentifier("library.tools")
     }
 
     private var librarySearch: some View {

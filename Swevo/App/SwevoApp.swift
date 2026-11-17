@@ -102,12 +102,12 @@ struct SwevoStartupView: View {
 
 enum SwevoTab: Int, Hashable {
     // SceneStorage persists these raw values independently of the display order.
-    case home = 0, tools = 1, cameraMoves = 2, me = 3
+    case home = 0, files = 1, cameraMoves = 2, me = 3
 
-    static let displayOrder: [Self] = [.home, .cameraMoves, .tools, .me]
+    static let displayOrder: [Self] = [.home, .cameraMoves, .files, .me]
 
-    var name: String { ["Videos", "Tools", "Camera moves", "Me"][rawValue] }
-    var artwork: String { ["GlyphFeed", "GlyphEdit", "GlyphLibrary", "GlyphSettings"][rawValue] }
+    var name: String { ["Videos", "Files", "Camera moves", "Me"][rawValue] }
+    var artwork: String { ["GlyphFeed", "GlyphFolder", "GlyphLibrary", "GlyphSettings"][rawValue] }
     var identifier: String { self == .cameraMoves ? "tab.cameraMoves" : "tab.\(name.lowercased())" }
 }
 
@@ -139,13 +139,12 @@ private extension View {
 private struct SwevoTabDock: View {
     static let maximumWidth: CGFloat = 304
     private static let tabSpacing: CGFloat = 4
-    private static let tabCornerRadius: CGFloat = 17
     @Binding var selection: SwevoTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        let tray = RoundedRectangle(cornerRadius: 23, style: .continuous)
+        let tray = Capsule()
         tabButtons
             .background { selectionGlass }
             .padding(5)
@@ -153,11 +152,17 @@ private struct SwevoTabDock: View {
                 if reduceTransparency {
                     tray.fill(SwevoStyle.surface)
                 } else {
-                    tray.fill(.thinMaterial)
-                        .overlay { tray.fill(SwevoStyle.surface.opacity(0.50)) }
+                    tray.fill(.ultraThinMaterial)
+                        .overlay { tray.fill(SwevoStyle.surface.opacity(0.48)) }
                 }
             }
-            .overlay { tray.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
+            .overlay {
+                tray.strokeBorder(
+                    LinearGradient(colors: [SwevoStyle.paper.opacity(0.28), SwevoStyle.line],
+                                   startPoint: .top, endPoint: .bottom), lineWidth: 1
+                )
+                .allowsHitTesting(false)
+            }
             .frame(maxWidth: Self.maximumWidth)
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
@@ -165,16 +170,15 @@ private struct SwevoTabDock: View {
     }
 
     private var tabButtons: some View {
-        let shape = RoundedRectangle(cornerRadius: Self.tabCornerRadius, style: .continuous)
-        return HStack(spacing: Self.tabSpacing) {
+        HStack(spacing: Self.tabSpacing) {
             ForEach(SwevoTab.displayOrder, id: \.self) { tab in
                 let selected = selection == tab
-                let tint = selected ? SwevoStyle.paper : SwevoStyle.secondary
+                let tint = selected ? SwevoStyle.paper : SwevoStyle.secondary.opacity(0.84)
                 Button { selection = tab } label: {
                     TintedArtwork(name: tab.artwork, tint: tint)
                         .frame(width: 24, height: 24)
+                        .padding(.bottom, 3)
                         .frame(minWidth: 44, maxWidth: .infinity, minHeight: 48)
-                        .background(SwevoStyle.paper.opacity(0.035), in: shape)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
@@ -193,20 +197,20 @@ private struct SwevoTabDock: View {
             let width = max(0, (geometry.size.width - gaps) / tabCount)
             let selectedIndex = SwevoTab.displayOrder.firstIndex(of: selection) ?? 0
             let inset = CGFloat(selectedIndex) * (width + Self.tabSpacing)
-            let shape = RoundedRectangle(cornerRadius: Self.tabCornerRadius, style: .continuous)
 
             Capsule().fill(SwevoStyle.accent)
-                .frame(width: 16, height: 2)
+                .frame(width: 14, height: 2)
                 .padding(.bottom, 5)
-                .frame(width: width, height: geometry.size.height, alignment: .bottom)
-                .swevoGlass(cornerRadius: Self.tabCornerRadius, tint: SwevoStyle.accent.opacity(0.36))
+                .frame(width: min(58, width), height: 42, alignment: .bottom)
+                .swevoGlass(cornerRadius: 21, tint: SwevoStyle.accent.opacity(0.38))
                 .overlay {
-                    shape.strokeBorder(
-                        LinearGradient(colors: [SwevoStyle.paper.opacity(0.56), SwevoStyle.accent.opacity(0.16)],
+                    Capsule().strokeBorder(
+                        LinearGradient(colors: [SwevoStyle.paper.opacity(0.62), SwevoStyle.accent.opacity(0.20)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing),
                         lineWidth: 1
                     )
                 }
+                .frame(width: width, height: geometry.size.height)
                 .padding(.leading, inset)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -233,7 +237,7 @@ struct SwevoRootView: View {
     @State private var editing: EditorPresentation?
     @State private var importing = false
     @State private var libraryFilter = "Imports"
-    @State private var showingFiles = false
+    @State private var showingFileTools = false
     @State private var showingPlus = false
     @State private var showingLessons = false
     @State private var returnToLessonEntry = false
@@ -245,7 +249,7 @@ struct SwevoRootView: View {
                 TabView(selection: $tab) {
                     videosTab.swevoTab(.home, nativeBar: nativeBar)
                     CameraMovesView(openPlus: openPlus).swevoTab(.cameraMoves, nativeBar: nativeBar)
-                    ToolsView(openPlus: openPlus).swevoTab(.tools, nativeBar: nativeBar)
+                    filesTab.swevoTab(.files, nativeBar: nativeBar)
                     AccountView().swevoTab(.me, nativeBar: nativeBar)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -264,7 +268,6 @@ struct SwevoRootView: View {
                 if returnToLessonEntry {
                     returnToLessonEntry = false
                     tab = .home
-                    showingFiles = false
                 }
             }) {
                 DiscoverView(canDismiss: true, returnToLinkInput: {
@@ -305,12 +308,20 @@ struct SwevoRootView: View {
                      openLibrary: { openFiles("Imports") },
                      openCameraMoves: { tab = .cameraMoves }, openPlus: openPlus)
                 .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(isPresented: $showingFiles) {
-                    LibraryView(edit: { editing = EditorPresentation(movie: $0) },
-                                browseVideos: { showingLessons = true },
-                                openEditor: { editing = EditorPresentation(movie: nil) },
-                                openPlus: openPlus, filter: $libraryFilter, importing: $importing)
-                        .navigationBarBackButtonHidden(importing)
+        }
+    }
+
+    private var filesTab: some View {
+        NavigationStack {
+            LibraryView(edit: { editing = EditorPresentation(movie: $0) },
+                        browseVideos: { showingLessons = true },
+                        openEditor: { editing = EditorPresentation(movie: nil) },
+                        openTools: { showingFileTools = true },
+                        openPlus: openPlus, filter: $libraryFilter, importing: $importing)
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(isPresented: $showingFileTools) {
+                    ToolsView(openPlus: openPlus)
+                        .sceneDismiss(symbol: .back, label: "Back", edge: .leading) { showingFileTools = false }
                         .toolbar(.hidden, for: .navigationBar)
                 }
         }
@@ -318,8 +329,8 @@ struct SwevoRootView: View {
 
     private func openFiles(_ filter: String) {
         libraryFilter = filter
-        tab = .home
-        showingFiles = true
+        showingFileTools = false
+        tab = .files
     }
 
     private func openPlus() { showingPlus = true }
