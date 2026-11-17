@@ -140,19 +140,20 @@ struct LibraryView: View {
     private func libraryHeader(stacked: Bool) -> some View {
         let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
                              : AnyLayout(HStackLayout(spacing: 8))
+        let tools = toolsEntry.fixedSize(horizontal: !stacked, vertical: false)
         let plus = PlusEntryButton(action: openPlus)
-            .fixedSize(horizontal: true, vertical: false)
+            .fixedSize(horizontal: !stacked, vertical: false)
         return layout {
             HStack(spacing: 8) {
-                toolsEntry.fixedSize(horizontal: !stacked, vertical: false)
-                if stacked {
-                    Spacer(minLength: 0)
-                    plus
-                }
+                librarySearch
+                if !stacked { tools }
             }
             HStack(spacing: 8) {
-                librarySearch
-                if !stacked { plus }
+                if stacked {
+                    tools
+                    Spacer(minLength: 0)
+                }
+                plus
             }
         }
     }
@@ -167,11 +168,11 @@ struct LibraryView: View {
                 LocalizedText("Tools").font(.capture(.footnote, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
+            .padding(.horizontal, 9).padding(.vertical, 6)
             .frame(minWidth: 44, minHeight: 44)
             .foregroundStyle(SwevoStyle.paper)
-            .swevoGlass(cornerRadius: 13)
-            .contentShape(.interaction, RoundedRectangle(cornerRadius: 13))
+            .background { Capsule().strokeBorder(SwevoStyle.line).padding(.vertical, 4) }
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
         .disabled(importing)
@@ -285,7 +286,7 @@ struct LibraryView: View {
     }
 
     private func archiveIndex(sidebar: Bool) -> some View {
-        let rows = VStack(spacing: 2) {
+        let rows = VStack(spacing: 0) {
             ForEach(Category.allCases) { entry in archiveTab(entry, vertical: true) }
         }
         return Group {
@@ -293,26 +294,28 @@ struct LibraryView: View {
                 rows
             } else {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 2) {
+                    HStack(alignment: .top, spacing: 8) {
                         ForEach(Category.allCases) { entry in archiveTab(entry, vertical: false) }
+                    }
+                    .background(alignment: .bottom) {
+                        Rectangle().fill(SwevoStyle.line).frame(height: 1)
+                            .accessibilityHidden(true)
                     }
                     rows
                 }
             }
         }
-        .padding(4)
-        .swevoGlass(cornerRadius: 17)
     }
 
     private func archiveTab(_ entry: Category, vertical: Bool) -> some View {
         let selected = category == entry
-        let glyph = Glyph(symbol: entry.glyph, size: 17, tint: selected ? SwevoStyle.accent : SwevoStyle.secondary)
+        let glyph = Glyph(symbol: entry.glyph, size: 15, tint: selected ? SwevoStyle.accent : SwevoStyle.secondary)
         let title = LocalizedText(entry.title)
             .font(.capture(.footnote, weight: .semibold))
             .fixedSize(horizontal: !vertical, vertical: true)
         let countText = Text(count(in: entry), format: .number)
         let total = countText
-            .font(.capture(.caption)).monospacedDigit()
+            .font(.capture(.caption, weight: .medium)).monospacedDigit()
             .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.secondary)
         return Button { filter = entry.rawValue } label: {
             Group {
@@ -324,23 +327,23 @@ struct LibraryView: View {
                         total
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
-                            glyph
-                            total
-                        }
+                    VStack(alignment: .leading, spacing: 8) {
                         title
+                        HStack(spacing: 5) {
+                            total
+                            Spacer(minLength: 0)
+                            glyph
+                        }
                     }
                 }
             }
-            .padding(.horizontal, 10).padding(.vertical, 10)
-            .frame(minWidth: 44, maxWidth: .infinity, minHeight: vertical ? 48 : 62, alignment: .leading)
+            .padding(.horizontal, 6).padding(.vertical, 8)
+            .frame(minWidth: 44, maxWidth: .infinity, minHeight: vertical ? 48 : 58, alignment: .leading)
             .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
-            .background(selected ? SwevoStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(alignment: vertical ? .leading : .bottom) {
-                if selected {
-                    Capsule().fill(SwevoStyle.accent)
-                        .frame(width: vertical ? 2 : 24, height: vertical ? 20 : 2)
+            .overlay(alignment: .bottom) {
+                if selected || vertical {
+                    Rectangle().fill(selected ? SwevoStyle.accent : SwevoStyle.line)
+                        .frame(height: selected ? 2 : 1)
                         .allowsHitTesting(false).accessibilityHidden(true)
                 }
             }
@@ -385,7 +388,7 @@ struct LibraryView: View {
         return VStack(alignment: .leading, spacing: 16) {
             if empty {
                 VStack(alignment: .leading, spacing: 6) {
-                    SceneTitle(category.emptyTitle, size: 29)
+                    SceneTitle(category.emptyTitle, size: 26)
                     LocalizedText(category.emptyMessage).font(.capture(.subheadline))
                         .foregroundStyle(SwevoStyle.secondary)
                         .fixedSize(horizontal: false, vertical: true)
