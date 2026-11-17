@@ -2,35 +2,27 @@ import SwiftUI
 import StoreKit
 
 struct PlusEntryButton: View {
-    var plain = false
     let action: () -> Void
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 13, style: .continuous)
-        let label = HStack(spacing: 8) {
-            LocalizedText("Plus").font(.capture(.footnote, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            Glyph(symbol: .back, size: 10, tint: SwevoStyle.ink)
-                .rotationEffect(.degrees(180))
-                .frame(width: 26, height: 26)
-                .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 8))
-        }
-        .padding(.leading, 11).padding(.trailing, 5).padding(.vertical, 5)
-        .frame(minWidth: 44, minHeight: 44)
-        .foregroundStyle(SwevoStyle.paper)
+        let shape = Capsule()
         return Button(action: action) {
-            if plain {
-                label.background(SwevoStyle.surface, in: shape)
-                    .contentShape(.interaction, shape)
-            } else {
-                label.swevoGlass(cornerRadius: 13)
-                    .contentShape(.interaction, shape)
+            HStack(spacing: 4) {
+                SwevoIllustration(name: "LaunchMark", height: 24).frame(width: 24)
+                LocalizedText("Plus").font(.capture(.footnote, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.leading, 6).padding(.trailing, 12).padding(.vertical, 5)
+            .frame(minHeight: 36)
+            .foregroundStyle(SwevoStyle.accent)
+            .background(SwevoStyle.surface.opacity(0.88), in: shape)
+            .overlay { shape.strokeBorder(SwevoStyle.accent.opacity(0.30)).allowsHitTesting(false) }
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
         .accessibilityLabel(LocalizedStringKey("Kstep Plus"))
         .accessibilityIdentifier("membership.tabEntry")
-        .frame(maxWidth: plain ? nil : .infinity, alignment: .trailing)
     }
 }
 
@@ -198,7 +190,7 @@ struct MembershipView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 benefits.frame(maxWidth: .infinity, alignment: .leading)
             }
-            PolicyLinks(compact: true)
+            PolicyLinks(style: .inline)
             if showsRewardOptions, !exportRequired, !commerce.premium, api.session != nil { rewardOption }
         }
     }
@@ -566,12 +558,15 @@ struct MembershipView: View {
 struct AccountView: View {
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var commerce: CommerceStore
     @EnvironmentObject private var quota: QuotaStore
     @EnvironmentObject private var ads: RewardedAds
     @EnvironmentObject private var accountAccess: AccountAccessFlow
     @State private var paywall = false
+    @State private var showsUsageDetails = false
     private var unavailable: Bool {
         accountAccess.isBusy || commerce.busy || commerce.preparingPurchase || ads.busy || ads.isPresenting
     }
@@ -590,15 +585,13 @@ struct AccountView: View {
         let width = min(640, SwevoStyle.pageContentWidth(in: container))
         let hasReservedRegion = SwevoStyle.intersectsReservedRegion(bounds, in: container)
         let wide = api.session != nil && width >= 620 && typeSize <= .xLarge && !hasReservedRegion
-        let allowanceWidth = wide ? (width - 24) / 2 : width
-        let stackAllowance = allowanceWidth < 290 || typeSize > .xLarge || hasReservedRegion
         let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
                           : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
 
         return layout {
             VStack(alignment: .leading, spacing: 12) {
                 if api.session != nil {
-                    allowance(stacked: stackAllowance)
+                    allowance
                     accountDetails
                 } else { ConnectionPanel() }
             }.frame(maxWidth: .infinity, alignment: .leading)
@@ -617,22 +610,32 @@ struct AccountView: View {
     }
 
     private var membershipEntry: some View {
-        let title = VStack(alignment: .leading, spacing: 6) {
-            SceneTitle("Kstep Plus", size: 34).accessibilityRemoveTraits(.isHeader)
-            if api.session != nil, commerce.premium || commerce.rightsVerified {
-                LocalizedText(commerce.premium ? "Plus active" : "Free plan")
-                    .font(.capture(.footnote, weight: .medium))
-                    .foregroundStyle(commerce.premium ? SwevoStyle.accent : SwevoStyle.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        let title = HStack(spacing: 8) {
+            SwevoIllustration(name: "LaunchMark", height: 42).frame(width: 42)
+            VStack(alignment: .leading, spacing: 4) {
+                SceneTitle("Kstep Plus", size: 25).accessibilityRemoveTraits(.isHeader)
+                if api.session != nil, commerce.premium || commerce.rightsVerified {
+                    LocalizedText(commerce.premium ? "Plus active" : "Free plan")
+                        .font(.capture(.footnote, weight: .medium))
+                        .foregroundStyle(commerce.premium ? SwevoStyle.accent : SwevoStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        let action = ActionLabel(title: commerce.premium ? "View membership" : "View plans")
+        let action = HStack(spacing: 8) {
+            LocalizedText(commerce.premium ? "View membership" : "View plans")
+                .font(.capture(.footnote, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+        }.foregroundStyle(SwevoStyle.accent)
 
         return Button { paywall = true } label: {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 16) {
+                HStack(spacing: 14) {
                     title.fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
+                    Rectangle().fill(SwevoStyle.line).frame(width: 1, height: 26)
+                        .accessibilityHidden(true)
                     action.fixedSize(horizontal: true, vertical: false)
                 }
                 VStack(alignment: .leading, spacing: 12) {
@@ -640,31 +643,35 @@ struct AccountView: View {
                     action
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
             .foregroundStyle(SwevoStyle.paper)
-            .contentShape(Rectangle())
+            .swevoGlass(cornerRadius: 20, tint: SwevoStyle.surface.opacity(0.74))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20).strokeBorder(SwevoStyle.accent.opacity(0.23))
+                    .allowsHitTesting(false)
+            }
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 20))
         }.buttonStyle(PressStyle()).disabled(unavailable)
             .accessibilityIdentifier("account.membership")
-            .padding(.top, 48)
+            .padding(.top, 40)
             .padding(.bottom, 8)
     }
 
-    private func allowance(stacked: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            LocalizedText("Today’s video allowance").font(.capture(.headline))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-            if commerce.premium || (quota.usage != nil && quota.error == nil) {
-                let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-                                     : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
-                layout {
-                    balance(.watch)
-                    Rectangle().fill(SwevoStyle.line)
-                        .frame(width: stacked ? nil : 1, height: stacked ? 1 : nil)
+    private var allowance: some View {
+        let hasUsage = quota.usage != nil && quota.error == nil
+        let hasDetails = hasUsage && !commerce.premium && (!quota.unlimited || !quota.downloadsUnlimited)
+        return VStack(alignment: .leading, spacing: 8) {
+            allowanceHeading(canShowDetails: hasDetails)
+            if commerce.premium || hasUsage {
+                VStack(spacing: 0) {
+                    allowanceStatus(.watch)
+                    Rectangle().fill(SwevoStyle.line).frame(height: 1)
                         .accessibilityHidden(true)
-                    balance(.download)
+                    allowanceStatus(.download)
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 14)
+                .background(SwevoStyle.surface.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
             } else if quota.error == nil {
                 HStack(spacing: 10) {
                     ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
@@ -674,12 +681,55 @@ struct AccountView: View {
                 }.frame(minHeight: 44)
             }
             if let error = quota.error { ErrorNote(message: error) }
-            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
             allowanceFooter
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { quota.resetIfNeeded() }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in quota.resetIfNeeded() }
+    }
+
+    @ViewBuilder private func allowanceHeading(canShowDetails: Bool) -> some View {
+        let title = LocalizedText("Online video").font(.capture(.headline))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+
+        if canShowDetails {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    title.fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    usageDetailsButton.fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    title
+                    usageDetailsButton
+                }
+            }
+        } else {
+            title
+        }
+    }
+
+    private var usageDetailsButton: some View {
+        let down = layoutDirection == .leftToRight ? -90.0 : 90.0
+        return Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
+                showsUsageDetails.toggle()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                LocalizedText(showsUsageDetails ? "Hide details" : "Usage details")
+                    .font(.capture(.footnote, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Glyph(symbol: .back, size: 10, tint: SwevoStyle.accent)
+                    .rotationEffect(.degrees(showsUsageDetails ? -down : down))
+            }
+            .foregroundStyle(SwevoStyle.accent)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("account.usageDetails")
     }
 
     @ViewBuilder private var allowanceFooter: some View {
@@ -717,59 +767,47 @@ struct AccountView: View {
             .accessibilityLabel("Get more daily views and downloads")
     }
 
-    private func balance(_ kind: AllowanceKind) -> some View {
+    private func allowanceStatus(_ kind: AllowanceKind) -> some View {
+        let isWatch = kind == .watch
         let unlimited = commerce.premium || quota.isUnlimited(kind)
-        let total = quota.totalAllowance(for: kind)
         let remaining = quota.remaining(kind)
-        let title = kind == .watch ? "Views left" : "Downloads left"
-        let language = AppLanguage.from(locale)
-        let remainingText = remaining.formatted(.number.locale(locale))
-        let totalText = total.formatted(.number.locale(locale))
-        let value = if unlimited {
-            L10n.display("Unlimited", language: language)
-        } else if total > 0 {
-            L10n.format("%@ of %@", [remainingText, totalText], language: language)
-        } else {
-            remainingText
-        }
-        let amount = Text(verbatim: remainingText)
-            .font(.capture(.largeTitle, weight: .semibold))
-            .foregroundStyle(remaining == 0 ? SwevoStyle.danger : SwevoStyle.paper)
+        let available = unlimited || remaining > 0
+        let title = LocalizedText(isWatch ? "Online viewing" : "Offline downloads")
+            .font(.capture(.subheadline, weight: .medium))
+            .foregroundStyle(SwevoStyle.paper)
+            .fixedSize(horizontal: false, vertical: true)
+        let status = LocalizedText(unlimited ? "Unlimited" : (available ? "Available today" : "Daily limit reached"))
+            .font(.capture(.footnote, weight: .medium))
+            .foregroundStyle(available ? SwevoStyle.accent : SwevoStyle.danger)
+            .fixedSize(horizontal: false, vertical: true)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            if unlimited {
-                LocalizedText("Unlimited")
-                    .font(.capture(.title3, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if total > 0 {
+        return HStack(alignment: .top, spacing: 10) {
+            Glyph(symbol: isWatch ? .play : .download, size: 16, tint: SwevoStyle.secondary)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 5) {
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        amount
-                        Text(verbatim: "/ \(totalText)")
-                            .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        title.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 0)
+                        status.fixedSize(horizontal: true, vertical: false)
                     }
-                    .fixedSize(horizontal: true, vertical: false)
-                    .environment(\.layoutDirection, .leftToRight)
-                    Text(verbatim: value).font(.capture(.title3, weight: .semibold))
-                        .foregroundStyle(remaining == 0 ? SwevoStyle.danger : SwevoStyle.paper)
+                    VStack(alignment: .leading, spacing: 3) {
+                        title
+                        status
+                    }
+                }
+                if showsUsageDetails, !unlimited {
+                    LocalizedText("%@ left · %@ total today", remaining.formatted(.number.locale(locale)),
+                                  quota.totalAllowance(for: kind).formatted(.number.locale(locale)))
+                        .font(.capture(.footnote)).monospacedDigit()
+                        .foregroundStyle(SwevoStyle.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .monospacedDigit()
-            } else {
-                amount.monospacedDigit().fixedSize(horizontal: false, vertical: true)
-            }
-            HStack(spacing: 8) {
-                Glyph(symbol: kind == .watch ? .play : .download, size: 15, tint: SwevoStyle.accent)
-                LocalizedText(title)
-                    .font(.capture(.subheadline, weight: .medium))
-                    .foregroundStyle(SwevoStyle.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(LocalizedStringKey(title)))
-        .accessibilityValue(Text(verbatim: value))
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 struct LuckyRewardView: View {

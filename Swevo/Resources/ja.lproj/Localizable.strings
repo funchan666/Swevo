@@ -860,3 +860,11 @@
 "Clear filters" = "絞り込みを解除";
 "Kstep’s online service is not configured yet. Local editing is available." = "Kstep のオンラインサービスはまだ設定されていません。端末内の動画は編集できます。";
 "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "Kstep に安全に接続できませんでした。ネットワークや VPN を確認して、もう一度お試しください。問題が続く場合は、サービスが一時的に利用できない可能性があります。";
+"Online video" = "オンライン動画";
+"Online viewing" = "オンライン再生";
+"Offline downloads" = "オフライン保存";
+"Available today" = "本日利用可";
+"Daily limit reached" = "本日の上限に達しました";
+"Usage details" = "利用状況の詳細";
+"Hide details" = "詳細を閉じる";
+"%@ left · %@ total today" = "残り%@回・本日の合計%@回";

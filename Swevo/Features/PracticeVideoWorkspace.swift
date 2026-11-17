@@ -71,6 +71,7 @@ struct ToolsView: View {
                   openingGap: 0, artworkOpacity: 0.84) { height in
             VStack(alignment: .leading, spacing: 12) {
                 PlusEntryButton(action: openPlus)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 if movie == nil {
                     Spacer(minLength: 16)
                     chooseVideo

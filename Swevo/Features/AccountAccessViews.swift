@@ -94,20 +94,27 @@ struct PolicyDocument: Identifiable {
 }
 
 struct PolicyLinks: View {
-    var compact = false
+    enum Style: Equatable { case buttons, inline, accountRows }
+
+    var style: Style = .buttons
     @EnvironmentObject private var api: APIClient
     @State private var document: PolicyDocument?
     var body: some View {
         Group {
-            if compact { linkLayout.buttonStyle(PressStyle()) }
-            else { linkLayout.buttonStyle(CompactActionStyle()) }
+            switch style {
+            case .buttons: linkLayout.buttonStyle(CompactActionStyle())
+            case .inline: linkLayout.buttonStyle(PressStyle())
+            case .accountRows:
+                VStack(alignment: .leading, spacing: 0) { links }.buttonStyle(PressStyle())
+            }
         }.sheet(item: $document) { PolicyBrowser(document: $0) }
     }
     private var linkLayout: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: compact ? 16 : 10) { links }
+        let inline = style == .inline
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: inline ? 16 : 10) { links }
                 .fixedSize(horizontal: true, vertical: false)
-            VStack(alignment: .leading, spacing: compact ? 0 : 10) { links }
+            VStack(alignment: .leading, spacing: inline ? 0 : 10) { links }
         }.font(.capture(.footnote, weight: .medium)).foregroundStyle(SwevoStyle.accent)
     }
     @ViewBuilder private var links: some View {
@@ -121,11 +128,38 @@ struct PolicyLinks: View {
 
     private func policyLink(_ title: String, url: URL) -> some View {
         Button { document = PolicyDocument(title: title, url: url) } label: {
-            LocalizedText(title)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(minWidth: 44, minHeight: compact ? 44 : nil, alignment: .leading)
-                .contentShape(Rectangle())
+            if style == .accountRows {
+                AccountLinkLabel(title: title)
+            } else {
+                LocalizedText(title)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minWidth: 44, minHeight: style == .inline ? 44 : nil, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
         }
+    }
+}
+
+private struct AccountLinkLabel: View {
+    let title: String
+    var symbol: SwevoGlyph? = nil
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let symbol { Glyph(symbol: symbol, size: 16, tint: SwevoStyle.accent) }
+            LocalizedText(title).font(.capture(.subheadline, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Glyph(symbol: .back, size: 10, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+        }
+        .padding(.vertical, 8)
+        .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .foregroundStyle(SwevoStyle.paper)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(SwevoStyle.line).frame(height: 1)
+                .allowsHitTesting(false).accessibilityHidden(true)
+        }
+        .contentShape(Rectangle())
     }
 }
 
@@ -304,12 +338,14 @@ struct AccountSettingsSection: View {
                 .accessibilityAddTraits(.isHeader)
             languagePreference
             if hasPolicies || ads.privacyOptionsRequired {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 0) {
                     if hasPolicies {
-                        LocalizedText("Privacy & terms").font(.capture(.subheadline, weight: .semibold))
+                        LocalizedText("Privacy & terms").font(.capture(.footnote, weight: .semibold))
+                            .foregroundStyle(SwevoStyle.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityAddTraits(.isHeader)
-                        PolicyLinks(compact: true)
+                            .padding(.bottom, 4)
+                        PolicyLinks(style: .accountRows)
                     }
                     if ads.privacyOptionsRequired {
                         settingsLink("Advertising privacy") {
@@ -321,7 +357,6 @@ struct AccountSettingsSection: View {
                     }
                 }
                 .disabled(unavailable)
-                Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
             }
             settingsFooter
             if let websiteError { ErrorNote(message: websiteError) }
@@ -330,83 +365,56 @@ struct AccountSettingsSection: View {
     }
 
     private var languagePreference: some View {
-        let title = HStack(spacing: 10) {
-            Glyph(symbol: .settings, size: 17, tint: SwevoStyle.accent)
-            LocalizedText("App language").font(.capture(.subheadline, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        let selectedLanguage = HStack(spacing: 8) {
-            Group {
-                if let language = AppLanguage(rawValue: languageCode) {
-                    Text(verbatim: language.nativeName)
-                } else {
-                    LocalizedText("Follow system")
-                }
-            }
-            .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
-        }
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         return Button { languagePicker = true } label: {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    title.fixedSize(horizontal: true, vertical: false)
-                    Spacer(minLength: 0)
-                    selectedLanguage.fixedSize(horizontal: true, vertical: false)
+            HStack(spacing: 12) {
+                Glyph(symbol: .settings, size: 19, tint: SwevoStyle.accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    LocalizedText("App language").font(.capture(.subheadline, weight: .semibold))
+                        .foregroundStyle(SwevoStyle.paper)
+                    Group {
+                        if let language = AppLanguage(rawValue: languageCode) {
+                            Text(verbatim: language.nativeName)
+                        } else {
+                            LocalizedText("Follow system")
+                        }
+                    }
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    title
-                    selectedLanguage
-                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
             }
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .overlay(alignment: .bottom) {
-                Divider().overlay(SwevoStyle.line).allowsHitTesting(false).accessibilityHidden(true)
-            }
-            .contentShape(Rectangle())
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+            .background(SwevoStyle.surface.opacity(0.52), in: shape)
+            .overlay { shape.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
+            .contentShape(.interaction, shape)
         }
         .buttonStyle(PressStyle())
         .accessibilityIdentifier("account.language")
     }
 
-    @ViewBuilder private var settingsFooter: some View {
-        let version = LocalizedText("Version %@", api.configuration.version)
-            .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        if let website = api.configuration.websiteURL {
-            let websiteLink = settingsLink("Official website", symbol: .link) {
-                websiteError = nil
-                openURL(website) { accepted in
-                    if !accepted { websiteError = "The browser could not open. Please try again." }
+    private var settingsFooter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let website = api.configuration.websiteURL {
+                settingsLink("Official website", symbol: .link) {
+                    websiteError = nil
+                    openURL(website) { accepted in
+                        if !accepted { websiteError = "The browser could not open. Please try again." }
+                    }
                 }
-            }.disabled(unavailable).accessibilityIdentifier("account.officialWebsite")
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    websiteLink.fixedSize(horizontal: true, vertical: false)
-                    Spacer(minLength: 0)
-                    version.fixedSize(horizontal: true, vertical: false)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    websiteLink
-                    version
-                }
+                .disabled(unavailable).accessibilityIdentifier("account.officialWebsite")
             }
-        } else {
-            version
+            LocalizedText("Version %@", api.configuration.version)
+                .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private func settingsLink(_ title: String, symbol: SwevoGlyph? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                if let symbol { Glyph(symbol: symbol, size: 14, tint: SwevoStyle.accent) }
-                LocalizedText(title)
-                    .font(.capture(.footnote, weight: .medium)).foregroundStyle(SwevoStyle.accent)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-            .contentShape(Rectangle())
+            AccountLinkLabel(title: title, symbol: symbol)
         }
         .buttonStyle(PressStyle())
     }

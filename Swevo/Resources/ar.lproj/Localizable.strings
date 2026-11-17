@@ -860,3 +860,11 @@
 "Clear filters" = "مسح عوامل التصفية";
 "Kstep’s online service is not configured yet. Local editing is available." = "لم تُضبط خدمة Kstep عبر الإنترنت بعد. يمكنك تعديل الفيديوهات على هذا الجهاز.";
 "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "تعذّر إنشاء اتصال آمن مع Kstep. تحقّق من الشبكة أو اتصال VPN ثم حاول مجددًا. إذا استمرت المشكلة، فقد تكون الخدمة غير متاحة مؤقتًا.";
+"Online video" = "الفيديو عبر الإنترنت";
+"Online viewing" = "المشاهدة عبر الإنترنت";
+"Offline downloads" = "التنزيل للمشاهدة بلا اتصال";
+"Available today" = "متاح اليوم";
+"Daily limit reached" = "تم بلوغ الحد اليومي";
+"Usage details" = "تفاصيل الاستخدام";
+"Hide details" = "إخفاء التفاصيل";
+"%@ left · %@ total today" = "المتبقي %@ · الإجمالي اليومي %@";

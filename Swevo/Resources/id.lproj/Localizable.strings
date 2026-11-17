@@ -860,3 +860,11 @@
 "Clear filters" = "Hapus filter";
 "Kstep’s online service is not configured yet. Local editing is available." = "Layanan online Kstep belum dikonfigurasi. Kamu bisa mengedit video di perangkat ini.";
 "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "Koneksi aman ke Kstep tidak dapat dibuat. Periksa jaringan atau VPN, lalu coba lagi. Jika masalah berlanjut, layanan mungkin tidak tersedia untuk sementara.";
+"Online video" = "Video online";
+"Online viewing" = "Tonton online";
+"Offline downloads" = "Unduh untuk ditonton offline";
+"Available today" = "Tersedia hari ini";
+"Daily limit reached" = "Batas harian tercapai";
+"Usage details" = "Rincian penggunaan";
+"Hide details" = "Sembunyikan rincian";
+"%@ left · %@ total today" = "Sisa %@ · Total hari ini %@";

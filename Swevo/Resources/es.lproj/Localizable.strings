@@ -860,3 +860,11 @@
 "Clear filters" = "Quitar filtros";
 "Kstep’s online service is not configured yet. Local editing is available." = "El servicio en línea de Kstep aún no está configurado. Puedes editar vídeos en este dispositivo.";
 "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "No se pudo establecer una conexión segura con Kstep. Comprueba tu red o VPN y vuelve a intentarlo. Si el problema continúa, es posible que el servicio no esté disponible temporalmente.";
+"Online video" = "Vídeos en línea";
+"Online viewing" = "Reproducción en línea";
+"Offline downloads" = "Descargas sin conexión";
+"Available today" = "Disponible hoy";
+"Daily limit reached" = "Límite diario alcanzado";
+"Usage details" = "Detalles de uso";
+"Hide details" = "Ocultar detalles";
+"%@ left · %@ total today" = "Restantes %@ · Total de hoy %@";

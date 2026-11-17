@@ -80,7 +80,7 @@ struct HomeView: View {
         let actionLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
                                    : AnyLayout(HStackLayout(spacing: 12))
         let title = SceneTitle("Open video", size: 27)
-        let plus = PlusEntryButton(plain: true, action: openPlus)
+        let plus = PlusEntryButton(action: openPlus)
         return VStack(alignment: .leading, spacing: 8) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
@@ -133,21 +133,7 @@ struct HomeView: View {
                             .contentShape(Rectangle())
                     }.buttonStyle(PressStyle()).accessibilityIdentifier("home.pasteLink")
                     if !stacked { Spacer(minLength: 0) }
-                    Button { openLink(link) } label: {
-                        let ink = hasLink ? SwevoStyle.ink : SwevoStyle.paper
-                        HStack(spacing: 8) {
-                            Glyph(symbol: .play, size: 13, tint: ink)
-                            LocalizedText("Open link").font(.capture(.subheadline, weight: .semibold))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 7)
-                        .frame(minWidth: 44, maxWidth: stacked ? .infinity : nil, minHeight: 44)
-                        .foregroundStyle(ink)
-                        .background(hasLink ? SwevoStyle.accent : SwevoStyle.paper.opacity(0.12), in: Capsule())
-                        .contentShape(.interaction, Capsule())
-                    }.buttonStyle(PressStyle()).disabled(!hasLink || searchRequest != nil)
-                        .accessibilityLabel("Open link")
-                        .accessibilityIdentifier("home.openLesson")
+                    openLinkButton(hasLink: hasLink, expands: stacked)
                 }
                 .padding(8)
             }
@@ -168,6 +154,25 @@ struct HomeView: View {
                     .environment(\.layoutDirection, .leftToRight)
             }
         }
+    }
+
+    private func openLinkButton(hasLink: Bool, expands: Bool) -> some View {
+        let ink = hasLink ? SwevoStyle.ink : SwevoStyle.paper
+        return Button { openLink(link) } label: {
+            HStack(spacing: 8) {
+                Glyph(symbol: .play, size: 13, tint: ink)
+                LocalizedText("Open link").font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 7)
+            .frame(minWidth: 44, maxWidth: expands ? .infinity : nil, minHeight: 44)
+            .foregroundStyle(ink)
+            .background(hasLink ? SwevoStyle.accent : SwevoStyle.paper.opacity(0.12), in: Capsule())
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle()).disabled(!hasLink || searchRequest != nil)
+        .accessibilityLabel("Open link")
+        .accessibilityIdentifier("home.openLesson")
     }
 
     private func pasteLink() {

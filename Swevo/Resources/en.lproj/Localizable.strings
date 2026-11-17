@@ -860,3 +860,11 @@
 "Clear filters" = "Clear filters";
 "Kstep’s online service is not configured yet. Local editing is available." = "Kstep’s online service is not configured yet. Local editing is available.";
 "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable.";
+"Online video" = "Online video";
+"Online viewing" = "Online viewing";
+"Offline downloads" = "Offline downloads";
+"Available today" = "Available today";
+"Daily limit reached" = "Daily limit reached";
+"Usage details" = "Usage details";
+"Hide details" = "Hide details";
+"%@ left · %@ total today" = "%@ left · %@ total today";
