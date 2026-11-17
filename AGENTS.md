@@ -5,10 +5,10 @@ Kstep 是以视频文件为核心的工具，提供播放、编辑和导出，�
 ## 业务与测试约定
 
 - 业务沿用 Clipo。「视频」页的链接输入框通过 `search-check` 进入可纵向切换的全屏播放器。游客登录、推荐、收藏、离线播放、编辑导出、额度、开屏与激励广告、订阅和恢复购买继续走原有路径。订阅与媒体导出保留服务端权益校验。
-- 当前是测试配置。API 为 `https://devapi.io-jp.com`，`getV2.name` 为 `Swevo`，取自 `SWEVO_RELEASE_NAME`。Bundle ID 为 `im.seex.lobo`，游客登录 `source` 和业务 `packageName` 同源。五包共用测试 BID，同一设备依次安装。
-- 广告使用 Clipo 的 Google 官方演示 App ID 和开屏、激励广告位。官网和隐私政策使用 HTTPS 占位链接，使用条款默认指向 Apple 标准 EULA。测试商品为月付 `coins_1.99` USD 9.99、年付 `conis_4.99` USD 99.99。会员页展示 StoreKit 返回的本地化价格和账期。
-- 播放联调可在首页链接栏输入 Clipo 的原测试短码。测试素材和广告配置见工具包的 [Clipo 基线](/Users/chengdupengyuyan/.codex/skills/toolkit/references/clipo-baseline.md) 第 1、5 节。Clipo 源工程位于 `/Users/chengdupengyuyan/Fun/Clipo`。
-- 用户确认本项目测试通过后，再收集尚未提供的正式 BID、API 域名、广告 App ID 和广告位、官网、用户协议和隐私政策。切换时 Bundle ID、登录 `source` 与业务 `packageName` 一起使用正式 BID，`getV2.name` 继续用 `Swevo`。核对正式月年商品与后台订单映射。
+- API 为 `https://o4r8xgd.kstep.site`，`getV2.name` 为 `Swevo`，取自 `SWEVO_RELEASE_NAME`。Bundle ID 暂用 `im.seex.lobo`，游客登录 `source` 和业务 `packageName` 同源。
+- 广告 App ID 由 `Config/Swevo.xcconfig` 提供。开屏和激励广告位从 `getV2.adList` 读取，演示模式已关闭。官网、隐私政策和条款使用 `www.kstep.site`。测试商品为月付 `coins_1.99`、年付 `conis_4.99`，会员页展示 StoreKit 返回的本地化价格和账期。
+- 播放联调使用当前 API 可访问的链接或短码。原测试配置和接口约定见工具包的 [Clipo 基线](/Users/chengdupengyuyan/.codex/skills/toolkit/references/clipo-baseline.md)。Clipo 源工程位于 `/Users/chengdupengyuyan/Fun/Clipo`。
+- 用户选定正式 BID 后，Bundle ID、登录 `source` 与业务 `packageName` 一起使用正式 BID。核对同一 BID 在后台的广告位和商品映射。
 
 ## 本项目的原创界面
 

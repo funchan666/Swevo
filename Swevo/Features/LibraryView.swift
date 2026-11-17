@@ -960,26 +960,18 @@ private struct OfflineExportButton: View {
 
 // Shared, live allowance display at the download decision and in the offline library.
 struct DownloadAllowanceSummary: View {
-    @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var quota: QuotaStore
     @EnvironmentObject private var commerce: CommerceStore
     @State private var showingReward = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            LocalizedText("Downloads left").font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-            LocalizedText(api.session == nil ? "Connect to refresh your allowance." :
-                            commerce.premium || quota.downloadsUnlimited ? "Unlimited" :
-                            quota.usage == nil ? "Loading…" : "\(quota.downloadsLeft) downloads left today")
-                .font(.capture(.subheadline, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
-            if quota.usage != nil, !commerce.premium { AllowanceResetText() }
+            AllowanceStatusPanel(kinds: [.download])
             if quota.canRequestReward(for: .download, premium: commerce.premium) {
                 ActionButton(title: "Get more downloads", primary: false) { showingReward = true }
             }
-        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background { CaptureSurface(tone: .plum) }
+        }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .contain)
-            .onAppear { quota.resetIfNeeded() }
-            .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in quota.resetIfNeeded() }
             .fullScreenCover(isPresented: $showingReward) { MembershipView(rewardKind: .download) }
     }
 }

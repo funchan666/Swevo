@@ -6,14 +6,15 @@ To try the local review workflow, open **Tools → Mark a range** or import a re
 
 Open `Swevo.xcodeproj` and select the shared `kstep` scheme for the `Kstep` app target. The minimum deployment target is iOS 17. The Duo layout paths use the iOS 27.1 SDK, which is available in Xcode 27.1.
 
-## Test configuration
+## Service configuration
 
-- API host `devapi.io-jp.com` and `getV2.name` `Swevo`.
-- Bundle ID `im.seex.lobo` in `Config/Swevo.xcconfig`. The guest login source and business package name derive from the same setting. These test apps share a Bundle ID, so install them one at a time.
-- Google iOS demo App ID, app-open and rewarded units. Membership requests `coins_1.99` and `conis_4.99` in Apple Sandbox. StoreKit supplies the prices and billing periods displayed in the app. Filter the Xcode console by `StoreKitPlans` for a missing or invalid product response.
-- The website and privacy policy still point to HTTPS placeholders. Terms of Use open the Apple standard EULA.
+- The API host is `o4r8xgd.kstep.site` and `getV2.name` is `Swevo`.
+- `Config/Swevo.xcconfig` uses the shared test Bundle ID `im.seex.lobo` pending selection of Kstep’s Bundle ID. The guest login source and business package name derive from it.
+- AdMob uses the packaged App ID in `Config/Swevo.xcconfig`. App-open and rewarded units come from `getV2.adList` as Google types `1` and `5` respectively. Each placement's `config.appId` must match the packaged App ID.
+- Membership uses the test product IDs `coins_1.99` and `conis_4.99`. StoreKit supplies the prices and billing periods displayed in the app. Filter the Xcode console by `StoreKitPlans` for a missing or invalid product response.
+- The app links to the [Kstep website](https://www.kstep.site), [privacy policy](https://www.kstep.site/privacy.html), and [terms](https://www.kstep.site/terms.html).
 
-For playback integration, enter the Clipo test short code from the Toolkit in the video link field and tap the play button. Verify that the result opens in the full-screen player and appears in the last opened preview after playback begins. Use an authorized test account when verifying Apple purchases and restores.
+For playback verification, enter a supported video link or short code from the configured API. Check the full-screen player and the entry under Recently opened. Use an authorized test account when verifying Apple purchases and restores.
 
 ## Playback and app-open diagnostics
 
@@ -23,9 +24,9 @@ For playback integration, enter the Clipo test short code from the Toolkit in th
 
 ## Production transition
 
-The checked-in Debug and Release configurations both inherit the test settings. After test acceptance, configure the production Bundle ID, API domain, AdMob setup, privacy and support links, and registered membership mapping. Keep the release configuration name `Swevo`. Check the actual submission archive and verify that its backend recognizes Apple Sandbox transactions during App Review.
+Debug and Release both inherit `Config/Swevo.xcconfig`. Once the Bundle ID is selected, use it for the signed app and the backend package registration. Verify the StoreKit products for that app and confirm that its backend recognizes Apple Sandbox transactions during App Review.
 
-In AdMob **Privacy & messaging**, publish the messages for the regions you serve and assign them to the iOS app matching the packaged AdMob App ID. Use the published privacy policy URL in the AdMob message. Google's demo App ID in the current checkout serves the official demo ads. Verify Kstep's messages with an AdMob App ID you manage and Google test devices. [Google iOS UMP setup](https://developers.google.com/admob/ios/privacy)
+In AdMob **Privacy & messaging**, publish the messages for the regions you serve and assign them to the iOS app matching the packaged AdMob App ID. Use Kstep's privacy policy URL in the AdMob message and verify consent and placements with Google test devices. [Google iOS UMP setup](https://developers.google.com/admob/ios/privacy)
 
 See the [App Review source audit](docs/AppReview/2026-11-16/review-report.md) for cross-device purchase restoration, guest account deletion, and submission evidence.
 

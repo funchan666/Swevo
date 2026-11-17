@@ -114,7 +114,6 @@ struct MembershipView: View {
         .tint(SwevoStyle.accent)
         .task { await commerce.refresh() }
         .task { await commerce.loadPlans() }
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in quota.resetIfNeeded() }
         .onDisappear {
             planTask?.cancel(); planTask = nil
             purchaseTask?.cancel(); purchaseTask = nil
@@ -191,7 +190,10 @@ struct MembershipView: View {
                 benefits.frame(maxWidth: .infinity, alignment: .leading)
             }
             PolicyLinks(style: .inline)
-            if showsRewardOptions, !exportRequired, !commerce.premium, api.session != nil { rewardOption }
+            if !exportRequired, !commerce.premium, api.session != nil {
+                AllowanceStatusPanel()
+                if showsRewardOptions { rewardOption }
+            }
         }
     }
 
@@ -481,7 +483,6 @@ struct MembershipView: View {
 
     private var rewardOption: some View {
         VStack(alignment: .leading, spacing: 12) {
-            LocalizedText("Daily limits").font(.capture(.headline))
             ForEach(rewardKind.map { [$0] } ?? AllowanceKind.allCases) { kind in
                 if quota.canRequestReward(for: kind, premium: commerce.premium) {
                     if quota.completedAds(kind) >= 3 {
@@ -504,18 +505,13 @@ struct MembershipView: View {
                         .buttonStyle(CompactActionStyle())
                 }
             }
-            LocalizedText(quota.unlimited ? "Unlimited views today" : "\(quota.watchesLeft) views left today")
-            LocalizedText(quota.downloadsUnlimited ? "Unlimited downloads today" : "\(quota.downloadsLeft) downloads left today")
-            AllowanceResetText()
             LocalizedText("After reaching a daily limit, finish an ad to get more views or downloads.")
                 .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary).fixedSize(horizontal: false, vertical: true)
             if let error = ads.error { ErrorNote(message: error) }
-            if let error = quota.error { ErrorNote(message: error) }
             if let message = ads.message {
                 LocalizedText(message).font(.capture(.footnote)).foregroundStyle(SwevoStyle.accent)
             }
-        }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-            .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func cancelRewardRequest() {
@@ -556,17 +552,12 @@ struct MembershipView: View {
 }
 
 struct AccountView: View {
-    @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.layoutDirection) private var layoutDirection
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var commerce: CommerceStore
-    @EnvironmentObject private var quota: QuotaStore
     @EnvironmentObject private var ads: RewardedAds
     @EnvironmentObject private var accountAccess: AccountAccessFlow
     @State private var paywall = false
-    @State private var showsUsageDetails = false
     private var unavailable: Bool {
         accountAccess.isBusy || commerce.busy || commerce.preparingPurchase || ads.busy || ads.isPresenting
     }
@@ -659,37 +650,92 @@ struct AccountView: View {
     }
 
     private var allowance: some View {
-        let hasUsage = quota.usage != nil && quota.error == nil
-        let hasDetails = hasUsage && !commerce.premium && (!quota.unlimited || !quota.downloadsUnlimited)
-        return VStack(alignment: .leading, spacing: 8) {
-            allowanceHeading(canShowDetails: hasDetails)
-            if commerce.premium || hasUsage {
-                VStack(spacing: 0) {
-                    allowanceStatus(.watch)
-                    Rectangle().fill(SwevoStyle.line).frame(height: 1)
-                        .accessibilityHidden(true)
-                    allowanceStatus(.download)
+        VStack(alignment: .leading, spacing: 8) {
+            AllowanceStatusPanel()
+            if commerce.premium {
+                LocalizedText("Included with your membership")
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Button { paywall = true } label: {
+                    HStack(spacing: 6) {
+                        LocalizedText("Get more").font(.capture(.footnote, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+                    }.frame(minWidth: 44, minHeight: 44)
+                        .foregroundStyle(SwevoStyle.accent)
+                        .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 14)
-                .background(SwevoStyle.surface.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
-            } else if quota.error == nil {
-                HStack(spacing: 10) {
-                    ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
-                    LocalizedText("Loading daily limits…")
-                        .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }.frame(minHeight: 44)
+                .buttonStyle(PressStyle()).disabled(unavailable)
+                .accessibilityLabel("Get more daily views and downloads")
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            if let error = quota.error { ErrorNote(message: error) }
-            allowanceFooter
+        }
+    }
+}
+
+struct AllowanceStatusPanel: View {
+    var kinds = AllowanceKind.allCases
+    @Environment(\.locale) private var locale
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var api: APIClient
+    @EnvironmentObject private var commerce: CommerceStore
+    @EnvironmentObject private var quota: QuotaStore
+    @State private var showsUsageDetails = false
+
+    private var hasUsage: Bool { quota.usage != nil && quota.error == nil }
+    private var canShowDetails: Bool { api.session != nil && hasUsage && !commerce.premium }
+    private var detailsVisible: Bool { canShowDetails && showsUsageDetails }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            allowanceHeading
+            if api.session == nil {
+                LocalizedText("Connect to refresh your allowance.")
+                    .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                if commerce.premium || hasUsage {
+                    statusRows
+                } else if quota.error == nil {
+                    HStack(spacing: 10) {
+                        ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
+                        LocalizedText("Loading daily limits…")
+                            .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }.frame(minHeight: 44)
+                }
+                if let error = quota.error { ErrorNote(message: error) }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { quota.resetIfNeeded() }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in quota.resetIfNeeded() }
     }
 
-    @ViewBuilder private func allowanceHeading(canShowDetails: Bool) -> some View {
-        let title = LocalizedText("Online video").font(.capture(.headline))
+    private var statusRows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(kinds) { kind in
+                if kind != kinds.first { rule }
+                allowanceStatus(kind)
+            }
+            if detailsVisible {
+                rule
+                AllowanceResetText().padding(.vertical, 10)
+            }
+        }
+        .padding(.horizontal, 14)
+        .background(SwevoStyle.surface.opacity(0.76), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var rule: some View {
+        Rectangle().fill(SwevoStyle.line).frame(height: 1).accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var allowanceHeading: some View {
+        let title = LocalizedText(kinds == [.download] ? "Daily limits" : "Online video")
+            .font(.capture(.headline))
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
 
@@ -732,41 +778,6 @@ struct AccountView: View {
         .accessibilityIdentifier("account.usageDetails")
     }
 
-    @ViewBuilder private var allowanceFooter: some View {
-        if commerce.premium {
-            LocalizedText("Included with your membership")
-                .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        } else if quota.usage != nil, quota.error == nil {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    AllowanceResetText().fixedSize(horizontal: true, vertical: false)
-                    Spacer(minLength: 0)
-                    moreAllowance.fixedSize(horizontal: true, vertical: false)
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    AllowanceResetText()
-                    moreAllowance
-                }
-            }
-        } else {
-            moreAllowance
-        }
-    }
-
-    private var moreAllowance: some View {
-        Button { paywall = true } label: {
-            HStack(spacing: 6) {
-                LocalizedText("Get more").font(.capture(.footnote, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
-            }.frame(minWidth: 44, minHeight: 44)
-                .foregroundStyle(SwevoStyle.accent)
-                .contentShape(Rectangle())
-        }.buttonStyle(PressStyle()).disabled(unavailable)
-            .accessibilityLabel("Get more daily views and downloads")
-    }
-
     private func allowanceStatus(_ kind: AllowanceKind) -> some View {
         let isWatch = kind == .watch
         let unlimited = commerce.premium || quota.isUnlimited(kind)
@@ -796,7 +807,7 @@ struct AccountView: View {
                         status
                     }
                 }
-                if showsUsageDetails, !unlimited {
+                if detailsVisible, !unlimited {
                     LocalizedText("%@ left · %@ total today", remaining.formatted(.number.locale(locale)),
                                   quota.totalAllowance(for: kind).formatted(.number.locale(locale)))
                         .font(.capture(.footnote)).monospacedDigit()
