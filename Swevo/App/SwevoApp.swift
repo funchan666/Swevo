@@ -138,6 +138,10 @@ private extension View {
 private struct SwevoTabDock: View {
     static let maximumWidth: CGFloat = 304
     private static let tabSpacing: CGFloat = 4
+    private static let buttonHeight: CGFloat = 48
+    private static let rimPadding: CGFloat = 5
+    private static let bottomGap: CGFloat = 6
+    static let occupiedHeight = buttonHeight + 2 * rimPadding + bottomGap
     @Binding var selection: SwevoTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -146,25 +150,23 @@ private struct SwevoTabDock: View {
         let tray = Capsule()
         tabButtons
             .background { selectionGlass }
-            .padding(5)
+            .padding(Self.rimPadding)
             .background {
                 if reduceTransparency {
                     tray.fill(SwevoStyle.surface)
-                } else {
-                    tray.fill(.ultraThinMaterial)
-                        .overlay { tray.fill(SwevoStyle.surface.opacity(0.48)) }
+                        .allowsHitTesting(false)
                 }
             }
             .overlay {
                 tray.strokeBorder(
-                    LinearGradient(colors: [SwevoStyle.paper.opacity(0.28), SwevoStyle.line],
+                    LinearGradient(colors: [SwevoStyle.paper.opacity(0.44), SwevoStyle.paper.opacity(0.22)],
                                    startPoint: .top, endPoint: .bottom), lineWidth: 1
                 )
                 .allowsHitTesting(false)
             }
             .frame(maxWidth: Self.maximumWidth)
             .padding(.horizontal, 12)
-            .padding(.bottom, 6)
+            .padding(.bottom, Self.bottomGap)
             .animation(reduceMotion ? nil : .smooth(duration: 0.29), value: selection)
     }
 
@@ -172,12 +174,13 @@ private struct SwevoTabDock: View {
         HStack(spacing: Self.tabSpacing) {
             ForEach(SwevoTab.displayOrder, id: \.self) { tab in
                 let selected = selection == tab
-                let tint = selected ? SwevoStyle.paper : SwevoStyle.secondary.opacity(0.84)
+                let tint = selected ? SwevoStyle.paper : SwevoStyle.secondary
                 Button { selection = tab } label: {
                     TintedArtwork(name: tab.artwork, tint: tint)
                         .frame(width: 24, height: 24)
+                        .shadow(color: SwevoStyle.ink.opacity(0.86), radius: 2, x: 0, y: 1)
                         .padding(.bottom, 3)
-                        .frame(minWidth: 44, maxWidth: .infinity, minHeight: 48)
+                        .frame(minWidth: 44, maxWidth: .infinity, minHeight: Self.buttonHeight)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
@@ -243,15 +246,15 @@ struct SwevoRootView: View {
     var body: some View {
         GeometryReader { container in
             let nativeBar = usesNativeTabBar(in: container)
-            // Give the dock its own layout space so the last row of a tab can scroll above it.
-            VStack(spacing: 0) {
-                TabView(selection: $tab) {
-                    videosTab.swevoTab(.home, nativeBar: nativeBar)
-                    CameraMovesView(openPlus: openPlus).swevoTab(.cameraMoves, nativeBar: nativeBar)
-                    filesTab.swevoTab(.files, nativeBar: nativeBar)
-                    AccountView().swevoTab(.me, nativeBar: nativeBar)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            TabView(selection: $tab) {
+                videosTab.swevoTab(.home, nativeBar: nativeBar)
+                CameraMovesView(openPlus: openPlus).swevoTab(.cameraMoves, nativeBar: nativeBar)
+                filesTab.swevoTab(.files, nativeBar: nativeBar)
+                AccountView().swevoTab(.me, nativeBar: nativeBar)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .environment(\.swevoTabDockInset, nativeBar ? 0 : SwevoTabDock.occupiedHeight)
+            .overlay(alignment: .bottom) {
                 if !nativeBar {
                     SwevoTabDock(selection: $tab)
                         .fixedSize(horizontal: false, vertical: true)
@@ -340,7 +343,7 @@ struct SwevoRootView: View {
         if environment.toolbarVerticalEdge != nil { return true }
 
         let width = min(SwevoTabDock.maximumWidth, container.size.width - 24)
-        let height = min(84, container.size.height)
+        let height = min(SwevoTabDock.occupiedHeight, container.size.height)
         let dock = CGRect(x: (container.size.width - width) / 2, y: container.size.height - height,
                           width: width, height: height)
         return SwevoStyle.intersectsReservedRegion(dock, in: container)
