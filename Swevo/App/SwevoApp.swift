@@ -338,12 +338,12 @@ struct SwevoRootView: View {
     private func openPlus() { showingPlus = true }
 
     private func usesNativeTabBar(in container: GeometryProxy) -> Bool {
-        if container.size.width < 224 { return true }
+        let height = SwevoTabDock.occupiedHeight
+        if container.size.width < 224 || container.size.height < height { return true }
         guard #available(iOS 27.1, *) else { return false }
         if environment.toolbarVerticalEdge != nil { return true }
 
         let width = min(SwevoTabDock.maximumWidth, container.size.width - 24)
-        let height = min(SwevoTabDock.occupiedHeight, container.size.height)
         let dock = CGRect(x: (container.size.width - width) / 2, y: container.size.height - height,
                           width: width, height: height)
         return SwevoStyle.intersectsReservedRegion(dock, in: container)
