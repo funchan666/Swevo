@@ -8,7 +8,7 @@ Open `Swevo.xcodeproj` and select the shared `kstep` scheme for the `Kstep` app 
 
 ## Service configuration
 
-- The API host is `o4r8xgd.kstep.site` and `getV2.name` is `Swevo`.
+- The API host is `o4r8xgd.kstep.site`. The app name and `getV2.name` use `Kstep` from `SWEVO_RELEASE_NAME`.
 - Builds use the shared test Bundle ID `im.seex.lobo`. The guest login `source` and business `packageName` use `site.kstepchan.motion`.
 - AdMob uses the packaged App ID in `Config/Swevo.xcconfig`. App-open and rewarded units come from `getV2.adList` as Google types `1` and `5` respectively. Each placement's `config.appId` must match the packaged App ID.
 - Membership uses the test product IDs `coins_1.99` and `conis_4.99`. StoreKit supplies the prices and billing periods displayed in the app. Filter the Xcode console by `StoreKitPlans` for a missing or invalid product response.

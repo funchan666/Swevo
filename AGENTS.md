@@ -5,7 +5,7 @@ Kstep 是以视频文件为核心的工具，提供播放、编辑和导出，�
 ## 业务与测试约定
 
 - 业务沿用 Clipo。「视频」页的链接输入框通过 `search-check` 进入可纵向切换的全屏播放器。游客登录、推荐、收藏、离线播放、编辑导出、额度、开屏与激励广告、订阅和恢复购买继续走原有路径。订阅与媒体导出保留服务端权益校验。
-- API 为 `https://o4r8xgd.kstep.site`，`getV2.name` 为 `Swevo`，取自 `SWEVO_RELEASE_NAME`。打包使用测试 BID `im.seex.lobo`，游客登录 `source` 和业务 `packageName` 使用 `site.kstepchan.motion`。
+- API 为 `https://o4r8xgd.kstep.site`，应用名与 `getV2.name` 共用 `SWEVO_RELEASE_NAME` 的 `Kstep`。打包使用测试 BID `im.seex.lobo`，游客登录 `source` 和业务 `packageName` 使用 `site.kstepchan.motion`。
 - 广告 App ID 由 `Config/Swevo.xcconfig` 提供。开屏和激励广告位从 `getV2.adList` 读取，演示模式已关闭。官网、隐私政策和条款使用 `www.kstep.site`。测试商品为月付 `coins_1.99`、年付 `conis_4.99`，会员页展示 StoreKit 返回的本地化价格和账期。
 - 播放联调使用当前 API 可访问的链接或短码。原测试配置和接口约定见工具包的 [Clipo 基线](/Users/chengdupengyuyan/.codex/skills/toolkit/references/clipo-baseline.md)。Clipo 源工程位于 `/Users/chengdupengyuyan/Fun/Clipo`。
 - 切换到正式签名时，将 `PRODUCT_BUNDLE_IDENTIFIER` 设为已选定的 `site.kstepchan.motion`，并核对后台的广告位和商品映射。

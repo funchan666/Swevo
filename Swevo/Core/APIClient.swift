@@ -12,7 +12,7 @@ struct SwevoConfiguration {
     let privacyURL: URL?
     let termsURL: URL?
     let websiteURL: URL?
-    // getV2 `name`: the registered app name, independent of the localized display name.
+    // getV2 `name`: the canonical app name, independent of locale.
     let releaseName: String
     // Build-configured Google demo ads (test builds only). Production reads getV2.adList.
     let adsTestMode: Bool

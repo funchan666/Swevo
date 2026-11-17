@@ -1,7 +1,7 @@
 // Use the shared test Bundle ID for the installed app.
 PRODUCT_BUNDLE_IDENTIFIER = im.seex.lobo
-// getV2 `name`; keep the original capitalisation.
-SWEVO_RELEASE_NAME = Swevo
+// Canonical app name used by the bundle and getV2.
+SWEVO_RELEASE_NAME = Kstep
 SWEVO_API_HOST = o4r8xgd.kstep.site
 // Backend identity for business packageName and guest-login source.
 SWEVO_SERVICE_PACKAGE_NAME = site.kstepchan.motion

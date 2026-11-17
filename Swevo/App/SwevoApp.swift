@@ -44,7 +44,7 @@ struct SwevoApp: App {
     }
 }
 
-// Keeps the original splash visible during the bounded cold-start ad opportunity.
+// Keeps launch feedback visible during the bounded cold-start ad opportunity.
 // Guest authentication prepares configuration and opens the app directly.
 struct SwevoStartupHost: View {
     @EnvironmentObject private var ads: RewardedAds
@@ -89,9 +89,8 @@ struct SwevoStartupHost: View {
 
 struct SwevoStartupView: View {
     var body: some View {
-        // Same centred mark as LaunchScreen.storyboard, so the hand-off does not jump.
-        SwevoIllustration(name: "LaunchMark", height: 108).frame(width: 108)
-            .overlay(alignment: .bottom) { ProgressView().tint(SwevoStyle.accent).offset(y: 52) }
+        ProgressView()
+            .tint(SwevoStyle.accent)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(.container, edges: .all)
             .accessibilityElement(children: .ignore)
