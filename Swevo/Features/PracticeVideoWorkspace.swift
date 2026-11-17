@@ -1865,9 +1865,10 @@ struct VideoImportActions: View {
                     LocalizedText("Importing…").font(.capture(.subheadline, weight: .semibold))
                 }.frame(minHeight: 48)
             } else if case let .sourcePair(stacked) = presentation {
-                pairedSources(stacked: stacked || typeSize > .xLarge)
+                sourceStrip(stacked: stacked || typeSize > .xLarge, filesTitle: "Files")
             } else if case let .library(stacked, photosFirst) = presentation {
-                librarySources(stacked: stacked || typeSize > .xLarge, photosFirst: photosFirst)
+                sourceStrip(stacked: stacked || typeSize > .xLarge,
+                            filesTitle: photosFirst ? "Files" : "Open video", photosFirst: photosFirst)
             } else {
                 let paired = prominent && !typeSize.isAccessibilitySize
                 let layout = paired ? AnyLayout(HStackLayout(spacing: 8))
@@ -1903,90 +1904,54 @@ struct VideoImportActions: View {
         }
     }
 
-    private func pairedSources(stacked: Bool) -> some View {
-        let layout = stacked ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 10))
-        return layout {
-            Button { showingFiles = true } label: {
-                pairedSourceLabel("Files", symbol: .folder, primary: true)
-            }
-            .buttonStyle(PressStyle())
-            .accessibilityLabel("Open video file")
-            .accessibilityIdentifier("video.import.files")
-
-            PhotosPicker(selection: $photo, matching: .videos, photoLibrary: .shared()) {
-                pairedSourceLabel("Photos", symbol: .feed, primary: false)
-            }
-            .buttonStyle(PressStyle())
-            .accessibilityLabel("Choose from Photos")
-            .accessibilityIdentifier("video.import.photos")
-        }
-    }
-
-    private func pairedSourceLabel(_ title: String, symbol: SwevoGlyph, primary: Bool) -> some View {
-        HStack(spacing: 9) {
-            Glyph(symbol: symbol, size: 17, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
-                .frame(width: 32, height: 34)
-                .background(primary ? SwevoStyle.accent : SwevoStyle.accent.opacity(0.12),
-                            in: RoundedRectangle(cornerRadius: 8))
-            LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 9).padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
-        .foregroundStyle(SwevoStyle.paper)
-        .swevoGlass(cornerRadius: 13)
-        .contentShape(.interaction, RoundedRectangle(cornerRadius: 13))
-    }
-
-    private func librarySources(stacked: Bool, photosFirst: Bool) -> some View {
-        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+    private func sourceStrip(stacked: Bool, filesTitle: String, photosFirst: Bool = false) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))
         let divider = Rectangle().fill(SwevoStyle.line)
-            .frame(width: stacked ? nil : 1, height: stacked ? 1 : nil)
-            .padding(stacked ? .horizontal : .vertical, 10)
-            .allowsHitTesting(false).accessibilityHidden(true)
+            .frame(width: stacked ? nil : 1, height: stacked ? 1 : 24)
+            .accessibilityHidden(true)
         let files = Button { showingFiles = true } label: {
-            librarySourceLabel(photosFirst ? "Files" : "Open video", glyph: .folder, primary: !photosFirst)
+            sourceLabel(filesTitle, glyph: .folder, primary: !photosFirst, stacked: stacked)
         }
         .buttonStyle(PressStyle())
         .fixedSize(horizontal: !stacked && photosFirst, vertical: false)
-        .overlay(alignment: stacked ? .top : .leading) { if photosFirst { divider } }
         .accessibilityLabel("Open video file")
         .accessibilityIdentifier("video.import.files")
 
         let photos = PhotosPicker(selection: $photo, matching: .videos, photoLibrary: .shared()) {
-            librarySourceLabel(photosFirst ? "Choose from Photos" : "Photos", glyph: .feed, primary: photosFirst)
+            sourceLabel(photosFirst ? "Choose from Photos" : "Photos", glyph: .feed, primary: photosFirst, stacked: stacked)
         }
         .buttonStyle(PressStyle())
         .fixedSize(horizontal: !stacked && !photosFirst, vertical: false)
-        .overlay(alignment: stacked ? .top : .leading) { if !photosFirst { divider } }
         .accessibilityLabel("Choose from Photos")
         .accessibilityIdentifier("video.import.photos")
 
         return layout {
             if photosFirst {
                 photos
+                divider
                 files
             } else {
                 files
+                divider
                 photos
             }
         }
         .padding(4)
-        .swevoGlass(cornerRadius: 20)
+        .swevoGlass(cornerRadius: 18, tint: SwevoStyle.raised.opacity(0.44))
     }
 
-    private func librarySourceLabel(_ title: String, glyph: SwevoGlyph, primary: Bool) -> some View {
-        HStack(spacing: 10) {
-            Glyph(symbol: glyph, size: 18, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
-                .frame(width: primary ? 34 : 24, height: 34)
-                .background(primary ? SwevoStyle.accent : .clear, in: Circle())
-            LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+    private func sourceLabel(_ title: String, glyph: SwevoGlyph, primary: Bool, stacked: Bool) -> some View {
+        HStack(spacing: 8) {
+            LocalizedText(title).font(.capture(.subheadline, weight: primary ? .semibold : .medium))
                 .fixedSize(horizontal: false, vertical: true)
+            if primary || stacked { Spacer(minLength: 4) }
+            Glyph(symbol: glyph, size: 19, tint: primary ? SwevoStyle.accent : SwevoStyle.secondary)
         }
-        .padding(.horizontal, 12).padding(.vertical, 5)
-        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(minWidth: 44, minHeight: 46, alignment: .leading)
         .foregroundStyle(SwevoStyle.paper)
+        .background(primary ? SwevoStyle.accent.opacity(0.105) : .clear,
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .contentShape(Rectangle())
     }
 
