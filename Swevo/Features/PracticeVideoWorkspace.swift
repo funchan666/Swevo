@@ -106,19 +106,7 @@ struct ToolsView: View {
 
     private var chooseVideo: some View {
         Button { selection = .editor(.studio, nil) } label: {
-            HStack(spacing: 10) {
-                Glyph(symbol: .folder, size: 20, tint: SwevoStyle.ink)
-                LocalizedText("Choose a video").font(.capture(.headline))
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Glyph(symbol: .back, size: 12, tint: SwevoStyle.ink)
-                    .rotationEffect(.degrees(180))
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .frame(minHeight: 52)
-            .foregroundStyle(SwevoStyle.ink)
-            .background { CaptureSurface(tone: .accent) }
-            .contentShape(Rectangle())
+            ActionLabel(title: "Choose a video", symbol: .folder)
         }
         .buttonStyle(PressStyle())
         .accessibilityHint("Choose a video from Photos or Files to start editing.")
@@ -166,7 +154,10 @@ struct ToolsView: View {
             savedRange(request, movie: movie, stacked: stacked)
         } else {
             Button { selection = .editor(.ranges, movie) } label: {
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
+                    Glyph(symbol: .bookmark, size: 20, tint: SwevoStyle.ink)
+                        .frame(width: 38, height: 46)
+                        .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 10))
                     VStack(alignment: .leading, spacing: 6) {
                         LocalizedText(VideoTool.ranges.title).font(.capture(.title3, weight: .semibold))
                             .foregroundStyle(SwevoStyle.paper)
@@ -175,9 +166,9 @@ struct ToolsView: View {
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Glyph(symbol: .bookmark, size: 25, tint: SwevoStyle.accent)
+                    Glyph(symbol: .back, size: 13, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
                 }
-                .padding(16)
+                .padding(12)
                 .frame(minHeight: 74)
                 .swevoGlass(cornerRadius: 16)
                 .contentShape(Rectangle())
@@ -268,14 +259,20 @@ struct ToolsView: View {
                             : AnyLayout(VStackLayout(alignment: .leading, spacing: 9))
         return Button { selection = .editor(tool, movie) } label: {
             label {
-                Glyph(symbol: tool.glyph, size: 21, tint: SwevoStyle.accent)
+                Glyph(symbol: tool.glyph, size: 18, tint: SwevoStyle.accent)
+                    .frame(width: 33, height: 33)
+                    .background(SwevoStyle.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
                 LocalizedText(tool.title).font(.capture(stacked ? .subheadline : .footnote, weight: .semibold))
                     .foregroundStyle(SwevoStyle.paper)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
+                if stacked {
+                    Spacer(minLength: 4)
+                    Glyph(symbol: .back, size: 12, tint: SwevoStyle.secondary).rotationEffect(.degrees(180))
+                }
             }
             .padding(.horizontal, 10).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: stacked ? 50 : 70, alignment: stacked ? .leading : .topLeading)
+            .frame(maxWidth: .infinity, minHeight: stacked ? 54 : 78, alignment: stacked ? .leading : .topLeading)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -1027,16 +1024,20 @@ private struct EditorCommand: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
-                if let symbol { Glyph(symbol: symbol, size: 16, tint: emphasized ? SwevoStyle.ink : SwevoStyle.accent) }
-                LocalizedText(title).font(.capture(.footnote, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+            if expanded {
+                ActionLabel(title: title, symbol: symbol, primary: emphasized)
+            } else {
+                HStack(spacing: 7) {
+                    if let symbol { Glyph(symbol: symbol, size: 16, tint: emphasized ? SwevoStyle.ink : SwevoStyle.accent) }
+                    LocalizedText(title).font(.capture(.footnote, weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .frame(minWidth: 44, minHeight: 44)
+                .foregroundStyle(emphasized ? SwevoStyle.ink : SwevoStyle.accent)
+                .background(emphasized ? SwevoStyle.accent : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .frame(minWidth: 44, maxWidth: expanded ? .infinity : nil, minHeight: 44)
-            .foregroundStyle(emphasized ? SwevoStyle.ink : SwevoStyle.accent)
-            .background(emphasized ? SwevoStyle.accent : Color.clear, in: RoundedRectangle(cornerRadius: 10))
-            .contentShape(Rectangle())
         }.buttonStyle(PressStyle())
     }
 }
@@ -1843,7 +1844,6 @@ struct VideoImportActions: View {
         case standard, prominent
         case library(stacked: Bool, photosFirst: Bool = false)
         case sourcePair(stacked: Bool)
-        case home(stacked: Bool)
     }
 
     @EnvironmentObject private var library: LibraryStore
@@ -1864,8 +1864,6 @@ struct VideoImportActions: View {
                     ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
                     LocalizedText("Importing…").font(.capture(.subheadline, weight: .semibold))
                 }.frame(minHeight: 48)
-            } else if case let .home(stacked) = presentation {
-                homeSources(stacked: stacked)
             } else if case let .sourcePair(stacked) = presentation {
                 pairedSources(stacked: stacked || typeSize > .xLarge)
             } else if case let .library(stacked, photosFirst) = presentation {
@@ -1905,37 +1903,6 @@ struct VideoImportActions: View {
         }
     }
 
-    private func homeSources(stacked: Bool) -> some View {
-        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                             : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
-        return layout {
-            Button { showingFiles = true } label: {
-                homeSourceLabel("Open video file", glyph: .folder)
-            }
-            .buttonStyle(PressStyle())
-            .accessibilityLabel("Open video file")
-            .accessibilityIdentifier("video.import.files")
-
-            PhotosPicker(selection: $photo, matching: .videos, photoLibrary: .shared()) {
-                homeSourceLabel("Photos", glyph: .feed)
-            }
-            .buttonStyle(PressStyle())
-            .accessibilityLabel("Choose from Photos")
-            .accessibilityIdentifier("video.import.photos")
-        }
-    }
-
-    private func homeSourceLabel(_ title: String, glyph: SwevoGlyph) -> some View {
-        HStack(spacing: 8) {
-            Glyph(symbol: glyph, size: 16, tint: SwevoStyle.secondary)
-            LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .foregroundStyle(SwevoStyle.paper)
-        .contentShape(Rectangle())
-    }
-
     private func pairedSources(stacked: Bool) -> some View {
         let layout = stacked ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 10))
         return layout {
@@ -1957,21 +1924,19 @@ struct VideoImportActions: View {
 
     private func pairedSourceLabel(_ title: String, symbol: SwevoGlyph, primary: Bool) -> some View {
         HStack(spacing: 9) {
-            Glyph(symbol: symbol, size: 18, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
+            Glyph(symbol: symbol, size: 17, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
+                .frame(width: 32, height: 34)
+                .background(primary ? SwevoStyle.accent : SwevoStyle.accent.opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 8))
             LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: 50)
-        .foregroundStyle(primary ? SwevoStyle.ink : SwevoStyle.paper)
-        .background {
-            if primary {
-                CaptureSurface(tone: .accent)
-            } else {
-                Color.clear.swevoGlass(cornerRadius: 12)
-            }
-        }
-        .contentShape(Rectangle())
+        .padding(.horizontal, 9).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+        .foregroundStyle(SwevoStyle.paper)
+        .swevoGlass(cornerRadius: 13)
+        .contentShape(.interaction, RoundedRectangle(cornerRadius: 13))
     }
 
     private func librarySources(stacked: Bool, photosFirst: Bool) -> some View {

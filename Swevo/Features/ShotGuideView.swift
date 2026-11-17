@@ -233,20 +233,7 @@ private struct ShotNoteReader: View {
 
     private func practiceLink(_ movement: ShotMovement) -> some View {
         NavigationLink(value: ShotGuideRoute.practice(movement)) {
-            HStack(spacing: 12) {
-                LocalizedText("Try this camera move").font(.capture(.subheadline, weight: .semibold))
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Glyph(symbol: .back, size: 15, tint: SwevoStyle.ink)
-                    .rotationEffect(.degrees(180))
-            }
-            .foregroundStyle(SwevoStyle.ink)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(minHeight: 52)
-            .background { CaptureSurface(tone: .accent) }
-            .contentShape(Rectangle())
+            ActionLabel(title: "Try this camera move", symbol: .edit)
         }
         .buttonStyle(PressStyle())
         .accessibilityIdentifier("shotGuide.try.\(movement.id)")

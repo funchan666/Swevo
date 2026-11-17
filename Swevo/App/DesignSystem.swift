@@ -3,16 +3,16 @@ import UIKit
 
 enum SwevoStyle {
     static let background = Color("LaunchBackground")
-    static let surface = Color(red: 0.137, green: 0.129, blue: 0.118)
-    static let raised = Color(red: 0.188, green: 0.173, blue: 0.153)
-    static let accent = Color(red: 0.906, green: 0.741, blue: 0.502)
-    static let ink = Color(red: 0.133, green: 0.106, blue: 0.075)
-    static let secondary = Color(red: 0.784, green: 0.745, blue: 0.686)
-    static let paper = Color(red: 0.965, green: 0.937, blue: 0.894)
-    static let paperSecondary = Color(red: 0.396, green: 0.341, blue: 0.275)
-    static let mist = Color(red: 0.906, green: 0.851, blue: 0.773)
-    static let line = paper.opacity(0.14)
-    static let danger = Color(red: 1, green: 0.650, blue: 0.670)
+    static let surface = Color(red: 25.0 / 255, green: 43.0 / 255, blue: 60.0 / 255)
+    static let raised = Color(red: 34.0 / 255, green: 55.0 / 255, blue: 74.0 / 255)
+    static let accent = Color(red: 143.0 / 255, green: 228.0 / 255, blue: 212.0 / 255)
+    static let ink = Color(red: 15.0 / 255, green: 33.0 / 255, blue: 43.0 / 255)
+    static let secondary = Color(red: 176.0 / 255, green: 197.0 / 255, blue: 214.0 / 255)
+    static let paper = Color(red: 239.0 / 255, green: 247.0 / 255, blue: 252.0 / 255)
+    static let paperSecondary = Color(red: 51.0 / 255, green: 75.0 / 255, blue: 94.0 / 255)
+    static let mist = Color(red: 211.0 / 255, green: 232.0 / 255, blue: 241.0 / 255)
+    static let line = paper.opacity(0.16)
+    static let danger = Color(red: 255.0 / 255, green: 172.0 / 255, blue: 186.0 / 255)
     static let pageMargin: CGFloat = 20
 
     static func pageContentWidth(in container: GeometryProxy) -> CGFloat {
@@ -81,6 +81,7 @@ struct SceneArtwork: View {
     }
 }
 
+/// Aspect-fill display for bundled scenery and empty-state artwork.
 struct SceneImage: View {
     let name: String
 
@@ -264,14 +265,47 @@ struct ActionButton: View {
     var action: () -> Void
     var body: some View {
         Button(action: action) {
-            LocalizedText(busy ? "Please wait…" : title).font(.capture(.subheadline, display: true))
-                .fixedSize(horizontal: false, vertical: true)
-                .multilineTextAlignment(.leading).padding(.horizontal, 16).padding(.vertical, 12)
-                .foregroundStyle(primary ? SwevoStyle.ink : SwevoStyle.paper)
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                .background { CaptureSurface(tone: primary ? .accent : .plum) }
-                .contentShape(.interaction, Rectangle())
+            ActionLabel(title: busy ? "Please wait…" : title, primary: primary, busy: busy)
         }.buttonStyle(PressStyle()).disabled(busy)
+    }
+}
+
+struct ActionLabel: View {
+    let title: String
+    var symbol: SwevoGlyph? = nil
+    var primary = true
+    var busy = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let iconTint = primary ? SwevoStyle.ink : SwevoStyle.accent
+
+        HStack(spacing: 10) {
+            LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Group {
+                if busy {
+                    ProgressView().tint(iconTint)
+                } else if let symbol {
+                    Glyph(symbol: symbol, size: 17, tint: iconTint)
+                } else {
+                    Glyph(symbol: .back, size: 13, tint: iconTint).rotationEffect(.degrees(180))
+                }
+            }
+            .frame(width: 38, height: 36)
+            .background(primary ? SwevoStyle.accent : SwevoStyle.accent.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 9))
+            .accessibilityHidden(true)
+        }
+        .padding(.leading, 14).padding(.trailing, 6).padding(.vertical, 6)
+        .frame(minHeight: 50)
+        .foregroundStyle(SwevoStyle.paper)
+        .background(primary ? SwevoStyle.raised : SwevoStyle.surface, in: shape)
+        .overlay { shape.strokeBorder(primary ? SwevoStyle.accent.opacity(0.30) : SwevoStyle.line).allowsHitTesting(false) }
+        .contentShape(.interaction, shape)
     }
 }
 
@@ -343,25 +377,7 @@ struct EmptyStateAction: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Glyph(symbol: symbol, size: 18, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
-                LocalizedText(title)
-                    .font(.capture(.subheadline, weight: .semibold))
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
-            .frame(minHeight: 48)
-            .foregroundStyle(primary ? SwevoStyle.ink : SwevoStyle.paper)
-            .background {
-                if primary {
-                    CaptureSurface(tone: .accent)
-                } else {
-                    Color.clear.swevoGlass(cornerRadius: 12)
-                }
-            }
-            .contentShape(.interaction, RoundedRectangle(cornerRadius: 12))
+            ActionLabel(title: title, symbol: symbol, primary: primary)
         }
         .buttonStyle(PressStyle())
     }
@@ -455,8 +471,8 @@ extension View {
         }
     }
 
-    func swevoGlass(cornerRadius: CGFloat = 16) -> some View {
-        modifier(SwevoGlass(cornerRadius: cornerRadius))
+    func swevoGlass(cornerRadius: CGFloat = 16, tint: Color? = nil) -> some View {
+        modifier(SwevoGlass(cornerRadius: cornerRadius, tint: tint))
     }
 
     func sceneDismiss(symbol: SwevoGlyph = .close, label: String = "Close", edge: HorizontalEdge = .trailing,
@@ -476,17 +492,19 @@ extension View {
 private struct SwevoGlass: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let cornerRadius: CGFloat
+    let tint: Color?
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if reduceTransparency {
-            content.background(SwevoStyle.raised, in: shape)
+            content.background(tint ?? .clear, in: shape)
+                .background(SwevoStyle.raised, in: shape)
                 .overlay { shape.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
         } else if #available(iOS 26, *) {
-            content.glassEffect(.regular.tint(SwevoStyle.surface.opacity(0.42)), in: shape)
+            content.glassEffect(.regular.tint(tint ?? SwevoStyle.raised.opacity(0.48)), in: shape)
         } else {
-            content.background(.ultraThinMaterial, in: shape)
-                .background(SwevoStyle.surface.opacity(0.65), in: shape)
+            content.background(tint ?? SwevoStyle.raised.opacity(0.52), in: shape)
+                .background(.ultraThinMaterial, in: shape)
                 .overlay { shape.strokeBorder(SwevoStyle.paper.opacity(0.22)).allowsHitTesting(false) }
         }
     }

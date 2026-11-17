@@ -34,8 +34,8 @@
 		C71000000000000000000001 /* Swevo/App/CaptureTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71000000000000000000002 /* Swevo/App/CaptureTypography.swift */; };
 		C71000000000000000000003 /* Swevo/Core/ShotPracticeJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71000000000000000000004 /* Swevo/Core/ShotPracticeJournal.swift */; };
 		C71000000000000000000005 /* Swevo/Features/ShotPracticeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71000000000000000000006 /* Swevo/Features/ShotPracticeView.swift */; };
-		C71000000000000000000007 /* BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C71000000000000000000008 /* BricolageGrotesque-SemiBold.ttf */; };
-		C71000000000000000000009 /* BricolageGrotesque-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C7100000000000000000000A /* BricolageGrotesque-OFL.txt */; };
+		C71000000000000000000007 /* Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C71000000000000000000008 /* Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf */; };
+		C71000000000000000000009 /* Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C7100000000000000000000A /* Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt */; };
 		C7F5D928DE552FB7782E6664 /* Swevo/Core/LessonContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F5C66D3BCB0711DB84F1A3B /* Swevo/Core/LessonContracts.swift */; };
 		D0DFDA960A87B68556723DA1 /* Swevo/Features/DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62B7ED2C47711EEDC253A7BD /* Swevo/Features/DiscoverView.swift */; };
 		E8A0A1000000000000000001 /* Swevo/Core/LessonStreamExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8A0A1000000000000000002 /* Swevo/Core/LessonStreamExport.swift */; };
@@ -81,8 +81,8 @@
 		C71000000000000000000002 /* Swevo/App/CaptureTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/App/CaptureTypography.swift; sourceTree = SOURCE_ROOT; };
 		C71000000000000000000004 /* Swevo/Core/ShotPracticeJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Core/ShotPracticeJournal.swift; sourceTree = SOURCE_ROOT; };
 		C71000000000000000000006 /* Swevo/Features/ShotPracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Features/ShotPracticeView.swift; sourceTree = SOURCE_ROOT; };
-		C71000000000000000000008 /* BricolageGrotesque-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf"; sourceTree = SOURCE_ROOT; };
-		C7100000000000000000000A /* BricolageGrotesque-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt"; sourceTree = SOURCE_ROOT; };
+		C71000000000000000000008 /* Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf"; sourceTree = SOURCE_ROOT; };
+		C7100000000000000000000A /* Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt"; sourceTree = SOURCE_ROOT; };
 		E3B808EADBFC1086054EA47A /* Swevo/Core/APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Core/APIClient.swift; sourceTree = SOURCE_ROOT; };
 		E4BD89A549F49134CAB0C817 /* Swevo/App/DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/App/DesignSystem.swift; sourceTree = SOURCE_ROOT; };
 		E8A0A1000000000000000002 /* Swevo/Core/LessonStreamExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Core/LessonStreamExport.swift; sourceTree = SOURCE_ROOT; };
@@ -118,8 +118,8 @@
 				C71000000000000000000006 /* Swevo/Features/ShotPracticeView.swift */,
 				C71000000000000000000004 /* Swevo/Core/ShotPracticeJournal.swift */,
 				C71000000000000000000002 /* Swevo/App/CaptureTypography.swift */,
-				C71000000000000000000008 /* BricolageGrotesque-SemiBold.ttf */,
-				C7100000000000000000000A /* BricolageGrotesque-OFL.txt */,
+				C71000000000000000000008 /* Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf */,
+				C7100000000000000000000A /* Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt */,
 				1AC010000000000000000001 /* Swevo/App/AppLanguage.swift */,
 				1AC0100000000000000000C8 /* InfoPlist.strings */,
 				1AC010000000000000000064 /* Localizable.strings */,
@@ -229,8 +229,8 @@
 				445B4DAFB0E123A139308F4D /* Swevo/Resources/Commerce.json in Resources */,
 				16EB816FD26D57C86FA63242 /* Swevo/Resources/PrivacyInfo.xcprivacy in Resources */,
 				A09B10000000000000000001 /* Swevo/Resources/LaunchScreen.storyboard in Resources */,
-				C71000000000000000000007 /* BricolageGrotesque-SemiBold.ttf in Resources */,
-				C71000000000000000000009 /* BricolageGrotesque-OFL.txt in Resources */,
+				C71000000000000000000007 /* Swevo/Resources/Fonts/BricolageGrotesque-SemiBold.ttf in Resources */,
+				C71000000000000000000009 /* Swevo/Resources/Fonts/BricolageGrotesque-OFL.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

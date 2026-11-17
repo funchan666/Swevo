@@ -6,20 +6,25 @@ struct PlusEntryButton: View {
     let action: () -> Void
 
     var body: some View {
-        let label = HStack(spacing: 6) {
+        let shape = RoundedRectangle(cornerRadius: 13, style: .continuous)
+        let label = HStack(spacing: 8) {
             LocalizedText("Plus").font(.capture(.footnote, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
-            Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+            Glyph(symbol: .back, size: 10, tint: SwevoStyle.ink)
+                .rotationEffect(.degrees(180))
+                .frame(width: 26, height: 26)
+                .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 8))
         }
-        .padding(.horizontal, plain ? 4 : 12).padding(.vertical, 6)
+        .padding(.leading, 11).padding(.trailing, 5).padding(.vertical, 5)
         .frame(minWidth: 44, minHeight: 44)
-        .foregroundStyle(SwevoStyle.accent)
+        .foregroundStyle(SwevoStyle.paper)
         return Button(action: action) {
             if plain {
-                label.contentShape(Rectangle())
+                label.background(SwevoStyle.surface, in: shape)
+                    .contentShape(.interaction, shape)
             } else {
-                label.swevoGlass(cornerRadius: 18)
-                    .contentShape(.interaction, RoundedRectangle(cornerRadius: 18))
+                label.swevoGlass(cornerRadius: 13)
+                    .contentShape(.interaction, shape)
             }
         }
         .buttonStyle(PressStyle())
@@ -456,32 +461,10 @@ struct MembershipView: View {
 
     private var checkoutButton: some View {
         let canShowOffer = selectedPlan != nil && !loadingCatalog
-        let foreground = canShowOffer ? SwevoStyle.ink : SwevoStyle.paper
-        let shape = RoundedRectangle(cornerRadius: 14)
         return Button {
             if canShowOffer { subscribe() } else { reloadPlans() }
         } label: {
-            HStack(spacing: 12) {
-                LocalizedText(purchaseButtonTitle).font(.capture(.headline, display: true))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if purchasing || loadingCatalog {
-                    loadingMark(width: 28, tint: canShowOffer ? SwevoStyle.ink : SwevoStyle.accent)
-                } else if canShowOffer {
-                    Glyph(symbol: .back, size: 14, tint: SwevoStyle.ink).rotationEffect(.degrees(180))
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 10)
-            .frame(minHeight: 52)
-            .foregroundStyle(foreground)
-            .background {
-                if canShowOffer {
-                    shape.fill(SwevoStyle.accent)
-                } else {
-                    Color.clear.swevoGlass(cornerRadius: 14)
-                }
-            }
-            .contentShape(shape)
+            ActionLabel(title: purchaseButtonTitle, primary: canShowOffer, busy: purchasing || loadingCatalog)
         }.buttonStyle(PressStyle())
             .disabled(interactionLocked || (canShowOffer && api.session == nil))
             .accessibilityIdentifier(canShowOffer ? "membership.subscribe" : "membership.retryPlans")
@@ -549,9 +532,9 @@ struct MembershipView: View {
         ads.cancelRewardLoading()
     }
 
-    private func loadingMark(width: CGFloat, tint: Color = SwevoStyle.accent) -> some View {
+    private func loadingMark(width: CGFloat) -> some View {
         Image("SwevoLoadingMark").renderingMode(.template).resizable().scaledToFit()
-            .foregroundStyle(tint)
+            .foregroundStyle(SwevoStyle.accent)
             .frame(width: width, height: 14)
             .phaseAnimator([false, true]) { content, dimmed in
                 content.opacity(reduceMotion || scenePhase != .active ? 1 : (dimmed ? 0.35 : 1))
@@ -643,16 +626,7 @@ struct AccountView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        let action = HStack(spacing: 8) {
-            LocalizedText(commerce.premium ? "View membership" : "View plans")
-                .font(.capture(.footnote, weight: .semibold))
-                .fixedSize(horizontal: false, vertical: true)
-            Glyph(symbol: .back, size: 11, tint: SwevoStyle.ink).rotationEffect(.degrees(180))
-        }
-        .padding(.horizontal, 14).padding(.vertical, 8)
-        .frame(minWidth: 44, minHeight: 46)
-        .foregroundStyle(SwevoStyle.ink)
-        .background { CaptureSurface(tone: .accent) }
+        let action = ActionLabel(title: commerce.premium ? "View membership" : "View plans")
 
         return Button { paywall = true } label: {
             ViewThatFits(in: .horizontal) {

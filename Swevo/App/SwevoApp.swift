@@ -100,8 +100,12 @@ struct SwevoStartupView: View {
     }
 }
 
-enum SwevoTab: Int, CaseIterable, Hashable {
-    case home, tools, cameraMoves, me
+enum SwevoTab: Int, Hashable {
+    // SceneStorage persists these raw values independently of the display order.
+    case home = 0, tools = 1, cameraMoves = 2, me = 3
+
+    static let displayOrder: [Self] = [.home, .cameraMoves, .tools, .me]
+
     var name: String { ["Videos", "Tools", "Camera moves", "Me"][rawValue] }
     var artwork: String { ["GlyphFeed", "GlyphEdit", "GlyphLibrary", "GlyphSettings"][rawValue] }
     var identifier: String { self == .cameraMoves ? "tab.cameraMoves" : "tab.\(name.lowercased())" }
@@ -134,36 +138,44 @@ private extension View {
 
 private struct SwevoTabDock: View {
     static let maximumWidth: CGFloat = 304
+    private static let tabSpacing: CGFloat = 4
+    private static let tabCornerRadius: CGFloat = 17
     @Binding var selection: SwevoTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Namespace private var highlight
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(SwevoTab.allCases, id: \.self) { tab in
+        let tray = RoundedRectangle(cornerRadius: 23, style: .continuous)
+        tabButtons
+            .background { selectionGlass }
+            .padding(5)
+            .background {
+                if reduceTransparency {
+                    tray.fill(SwevoStyle.surface)
+                } else {
+                    tray.fill(.thinMaterial)
+                        .overlay { tray.fill(SwevoStyle.surface.opacity(0.50)) }
+                }
+            }
+            .overlay { tray.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
+            .frame(maxWidth: Self.maximumWidth)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.29), value: selection)
+    }
+
+    private var tabButtons: some View {
+        let shape = RoundedRectangle(cornerRadius: Self.tabCornerRadius, style: .continuous)
+        return HStack(spacing: Self.tabSpacing) {
+            ForEach(SwevoTab.displayOrder, id: \.self) { tab in
                 let selected = selection == tab
+                let tint = selected ? SwevoStyle.paper : SwevoStyle.secondary
                 Button { selection = tab } label: {
-                    TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.accent : SwevoStyle.paper)
-                    .frame(width: 24, height: 24)
-                    .frame(minWidth: 44, maxWidth: .infinity, minHeight: 48)
-                    .background {
-                        if selected {
-                            let shape = RoundedRectangle(cornerRadius: 17)
-                            shape.fill(SwevoStyle.accent.opacity(0.14))
-                                .matchedGeometryEffect(id: "selected-tab", in: highlight)
-                                .transition(.identity)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .overlay(alignment: .bottom) {
-                        if selected {
-                            Capsule().fill(SwevoStyle.accent)
-                                .frame(width: 16, height: 2)
-                                .padding(.bottom, 5)
-                                .allowsHitTesting(false).accessibilityHidden(true)
-                        }
-                    }
-                    .contentShape(Rectangle())
+                    TintedArtwork(name: tab.artwork, tint: tint)
+                        .frame(width: 24, height: 24)
+                        .frame(minWidth: 44, maxWidth: .infinity, minHeight: 48)
+                        .background(SwevoStyle.paper.opacity(0.035), in: shape)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
                 .accessibilityElement(children: .ignore)
@@ -172,12 +184,34 @@ private struct SwevoTabDock: View {
                 .accessibilityIdentifier(tab.identifier)
             }
         }
-        .padding(5)
-        .swevoGlass(cornerRadius: 23)
-        .frame(maxWidth: Self.maximumWidth)
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selection)
+    }
+
+    private var selectionGlass: some View {
+        GeometryReader { geometry in
+            let tabCount = CGFloat(SwevoTab.displayOrder.count)
+            let gaps = Self.tabSpacing * (tabCount - 1)
+            let width = max(0, (geometry.size.width - gaps) / tabCount)
+            let selectedIndex = SwevoTab.displayOrder.firstIndex(of: selection) ?? 0
+            let inset = CGFloat(selectedIndex) * (width + Self.tabSpacing)
+            let shape = RoundedRectangle(cornerRadius: Self.tabCornerRadius, style: .continuous)
+
+            Capsule().fill(SwevoStyle.accent)
+                .frame(width: 16, height: 2)
+                .padding(.bottom, 5)
+                .frame(width: width, height: geometry.size.height, alignment: .bottom)
+                .swevoGlass(cornerRadius: Self.tabCornerRadius, tint: SwevoStyle.accent.opacity(0.36))
+                .overlay {
+                    shape.strokeBorder(
+                        LinearGradient(colors: [SwevoStyle.paper.opacity(0.56), SwevoStyle.accent.opacity(0.16)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        lineWidth: 1
+                    )
+                }
+                .padding(.leading, inset)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -210,8 +244,8 @@ struct SwevoRootView: View {
             VStack(spacing: 0) {
                 TabView(selection: $tab) {
                     videosTab.swevoTab(.home, nativeBar: nativeBar)
-                    ToolsView(openPlus: openPlus).swevoTab(.tools, nativeBar: nativeBar)
                     CameraMovesView(openPlus: openPlus).swevoTab(.cameraMoves, nativeBar: nativeBar)
+                    ToolsView(openPlus: openPlus).swevoTab(.tools, nativeBar: nativeBar)
                     AccountView().swevoTab(.me, nativeBar: nativeBar)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

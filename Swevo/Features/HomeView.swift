@@ -46,7 +46,7 @@ struct HomeView: View {
                 layout {
                     VStack(alignment: .leading, spacing: 4) {
                         VideoImportActions(onImported: edit, importing: $importing,
-                                           presentation: .home(stacked: stacksControls))
+                                           presentation: .sourcePair(stacked: stacksControls))
                         Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
                         viewFilesShortcut
                         cameraMovesEntry(width: columnWidth)
@@ -78,19 +78,21 @@ struct HomeView: View {
     private func linkComposer(stacked: Bool) -> some View {
         let hasLink = !link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let source = WebAddress.media(link)?.host
-        let actionLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                                   : AnyLayout(HStackLayout(spacing: 12))
+        let actionLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                                   : AnyLayout(HStackLayout(spacing: 8))
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                SceneTitle("Video URL", size: 30)
+                SceneTitle("Open video", size: 30)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 PlusEntryButton(plain: true, action: openPlus)
                     .fixedSize(horizontal: !stacked, vertical: true)
             }
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
                     Glyph(symbol: .link, size: 20, tint: SwevoStyle.accent)
+                        .frame(width: 36, height: 36)
+                        .background(SwevoStyle.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
                     TextField("Paste a video link", text: Binding(get: { link }, set: {
                         link = $0
                         linkError = nil
@@ -98,7 +100,7 @@ struct HomeView: View {
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                     .focused($linkFocused).submitLabel(.go).onSubmit { openLink(link) }
                     .font(.capture(.body)).environment(\.layoutDirection, .leftToRight)
-                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .frame(maxWidth: .infinity, minHeight: 48)
                     .accessibilityLabel("Video link")
                     .accessibilityIdentifier("home.videoLink")
                     if !link.isEmpty {
@@ -109,37 +111,28 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, link.isEmpty ? 16 : 4)
+                .padding(.leading, 6)
+                .padding(.trailing, link.isEmpty ? 12 : 2)
+                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 13))
 
-                Divider().overlay(SwevoStyle.line).padding(.horizontal, 12)
-                    .allowsHitTesting(false).accessibilityHidden(true)
                 actionLayout {
                     Button(action: pasteLink) {
                         LocalizedText("Paste").font(.capture(.subheadline, weight: .semibold))
-                            .foregroundStyle(SwevoStyle.paper)
+                            .foregroundStyle(SwevoStyle.accent)
                             .fixedSize(horizontal: !stacked, vertical: true)
-                            .padding(.horizontal, 8)
-                            .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                            .padding(.horizontal, 12).padding(.vertical, 5)
+                            .frame(minWidth: 44, maxWidth: stacked ? .infinity : nil, minHeight: 50)
+                            .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 12))
+                            .contentShape(Rectangle())
                     }.buttonStyle(PressStyle()).accessibilityIdentifier("home.pasteLink")
-                    if !stacked { Spacer(minLength: 0) }
                     Button { openLink(link) } label: {
-                        HStack(spacing: 8) {
-                            Glyph(symbol: .play, size: 14, tint: hasLink ? SwevoStyle.ink : SwevoStyle.secondary)
-                            LocalizedText("Open link").font(.capture(.subheadline, weight: .semibold))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .frame(minWidth: 44, maxWidth: stacked ? .infinity : nil, minHeight: 44)
-                        .foregroundStyle(hasLink ? SwevoStyle.ink : SwevoStyle.secondary)
-                        .background(hasLink ? SwevoStyle.accent : SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 12))
-                        .contentShape(Rectangle())
+                        ActionLabel(title: "Open link", symbol: .play, primary: hasLink)
                     }.buttonStyle(PressStyle()).disabled(!hasLink || searchRequest != nil)
                         .accessibilityLabel("Open link")
                         .accessibilityIdentifier("home.openLesson")
                 }
-                .padding(8)
             }
+            .padding(8)
             .swevoGlass(cornerRadius: 20)
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
@@ -292,13 +285,13 @@ struct HomeView: View {
     private func cameraMovesEntry(width: CGFloat) -> some View {
         let artwork = "SceneShot"
         let showsArtwork = width >= 280 && typeSize <= .xLarge && ArtworkCatalog.has(artwork)
-        let shape = RoundedRectangle(cornerRadius: 16)
+        let shape = RoundedRectangle(cornerRadius: 18)
 
         return Button {
             linkFocused = false
             openCameraMoves()
         } label: {
-            HStack(spacing: 12) {
+            HStack(alignment: .bottom, spacing: 12) {
                 SceneTitle("Camera moves", size: 22)
                     .foregroundStyle(SwevoStyle.paper)
                     .accessibilityRemoveTraits(.isHeader)
@@ -306,21 +299,20 @@ struct HomeView: View {
                 Spacer(minLength: 0)
                 Glyph(symbol: .back, size: 13, tint: SwevoStyle.ink)
                     .rotationEffect(.degrees(180))
-                    .frame(width: 34, height: 34)
-                    .background(SwevoStyle.accent, in: Circle())
+                    .frame(width: 38, height: 36)
+                    .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 10))
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: showsArtwork ? 96 : 64, alignment: .leading)
-            .background(alignment: .trailing) {
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: showsArtwork ? 112 : 64, alignment: .bottomLeading)
+            .background {
                 if showsArtwork {
                     SceneImage(name: artwork)
-                        .frame(width: min(340, width * 0.68))
-                        .mask {
+                        .overlay {
                             LinearGradient(stops: [
-                                .init(color: .clear, location: 0),
-                                .init(color: .black.opacity(0.18), location: 0.30),
-                                .init(color: .black, location: 0.68),
-                                .init(color: .black, location: 1)
+                                .init(color: SwevoStyle.background.opacity(0.98), location: 0),
+                                .init(color: SwevoStyle.background.opacity(0.87), location: 0.40),
+                                .init(color: SwevoStyle.background.opacity(0.18), location: 0.76),
+                                .init(color: SwevoStyle.background.opacity(0.08), location: 1)
                             ], startPoint: .leading, endPoint: .trailing)
                         }
                 }
@@ -411,7 +403,6 @@ struct CameraMovesView: View {
     @State private var browsing = false
     @State private var channels: [LandingInfo] = []
     @State private var channelRetry = 0
-    @State private var exampleID: ShotNote.ID?
     @State private var destination: Destination?
 
     private enum Destination: Identifiable {
@@ -430,27 +421,28 @@ struct CameraMovesView: View {
 
     var body: some View {
         let request = ChannelRequest(links: commerce.release?.lcList?["us"] ?? [], attempt: channelRetry)
-        ScenePage(artwork: "SceneLessons", depth: 222, openingGap: 0) { height in
-            VStack(alignment: .leading, spacing: 12) {
+        ScenePage(artwork: "SceneLessons", depth: 276, openingGap: 0) { height in
+            VStack(alignment: .leading, spacing: 8) {
                 PlusEntryButton(action: openPlus)
-                Spacer(minLength: 16)
-                SceneTitle("Camera moves", size: 38)
+                Spacer(minLength: 24)
+                SceneTitle("Camera moves", size: 42)
+                browseEntry
             }
             .frame(minHeight: height, alignment: .top)
         } content: { container in
             let width = min(680, SwevoStyle.pageContentWidth(in: container))
             let bounds = CGRect(origin: .zero, size: container.size)
             let hasReservedRegion = SwevoStyle.intersectsReservedRegion(bounds, in: container)
-            let wide = typeSize <= .xLarge && width >= 600 && !hasReservedRegion
-            let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 24))
-                              : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            let stacked = width < 320 || typeSize > .xLarge || hasReservedRegion
+            let wide = !stacked && width >= 600
+            let workflowLayout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 20))
+                                      : AnyLayout(VStackLayout(alignment: .leading, spacing: 14))
 
-            VStack(alignment: .leading, spacing: 22) {
-                browseEntry(width: width, allowsArtwork: !hasReservedRegion)
-                examples(stacked: width < 280 || typeSize.isAccessibilitySize || hasReservedRegion)
-                layout {
+            VStack(alignment: .leading, spacing: 28) {
+                examples(width: width, wide: wide, stacked: stacked)
+                workflowLayout {
                     plannerEntry
-                    recordsEntry
+                    recordsEntry(showsThumbnail: !stacked)
                 }
                 connection
                 referenceFootage
@@ -492,75 +484,45 @@ struct CameraMovesView: View {
             }
     }
 
-    private func browseEntry(width: CGFloat, allowsArtwork: Bool) -> some View {
-        let artwork = "SceneEdit"
-        let showsArtwork = allowsArtwork && width >= 300 && typeSize <= .xLarge && ArtworkCatalog.has(artwork)
-        let shape = RoundedRectangle(cornerRadius: 16)
-
-        return Button { browsing = true } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    SceneTitle("Browse videos", size: 25)
-                        .foregroundStyle(SwevoStyle.paper)
-                        .accessibilityRemoveTraits(.isHeader)
-                    LocalizedText("Find a shot to try.").font(.capture(.footnote))
-                        .foregroundStyle(SwevoStyle.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: showsArtwork ? width * 0.55 : .infinity, alignment: .leading)
-                Spacer(minLength: 0)
-                Glyph(symbol: .play, size: 19, tint: SwevoStyle.ink)
-                    .frame(width: 44, height: 44)
-                    .background(SwevoStyle.accent, in: Circle())
+    private var browseEntry: some View {
+        Button { browsing = true } label: {
+            HStack(spacing: 10) {
+                Glyph(symbol: .play, size: 13, tint: SwevoStyle.ink)
+                    .frame(width: 30, height: 30)
+                    .background(SwevoStyle.accent, in: RoundedRectangle(cornerRadius: 8))
+                LocalizedText("Browse videos").font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: showsArtwork ? 110 : 72, alignment: .leading)
-            .background(alignment: .trailing) {
-                if showsArtwork {
-                    SceneImage(name: artwork)
-                        .frame(width: min(480, width * 0.74))
-                        .mask {
-                            LinearGradient(stops: [
-                                .init(color: .clear, location: 0),
-                                .init(color: .black.opacity(0.16), location: 0.50),
-                                .init(color: .black, location: 0.80)
-                            ], startPoint: .leading, endPoint: .trailing)
-                        }
-                }
-            }
-            .background(SwevoStyle.surface)
-            .clipShape(shape)
-            .overlay { shape.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
-            .contentShape(.interaction, shape)
+            .padding(.leading, 8).padding(.trailing, 14).padding(.vertical, 6)
+            .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(SwevoStyle.paper)
+            .swevoGlass(cornerRadius: 13)
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(PressStyle())
         .accessibilityIdentifier("cameraMoves.browseVideos")
     }
 
-    private func examples(stacked: Bool) -> some View {
+    private func examples(width: CGFloat, wide: Bool, stacked: Bool) -> some View {
         let moves = ShotNote.all.filter { $0.category == "Movement" }
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 20))
+                          : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+        let supportingPhotoWidth: CGFloat? = wide || stacked ? nil : width * 0.60
 
-        return VStack(alignment: .leading, spacing: 10) {
-            LocalizedText("Shot examples").font(.capture(.headline))
+        return VStack(alignment: .leading, spacing: 14) {
+            LocalizedText("Shot examples").font(.capture(.title3, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-            if stacked {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(moves, content: exampleButton)
-                }
-            } else {
-                ScrollView(.horizontal) {
-                    LazyHStack(alignment: .top, spacing: 12) {
-                        ForEach(moves) { note in
-                            exampleButton(note)
-                                .containerRelativeFrame(.horizontal) { width, _ in min(206, width * 0.43) }
+            if let featured = moves.first {
+                layout {
+                    exampleButton(featured, aspect: wide ? 4.0 / 3 : 3.0 / 2, featured: true)
+                        .frame(width: wide ? min(350, (width - 20) * 0.55) : nil)
+                    VStack(alignment: .leading, spacing: 16) {
+                        ForEach(moves.dropFirst()) { note in
+                            exampleButton(note, photoWidth: supportingPhotoWidth, aspect: wide ? 2.0 : 3.0 / 2)
                         }
                     }
-                    .scrollTargetLayout()
                 }
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $exampleID, anchor: .leading)
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
             LearningLink(symbol: .folder, title: "Shot field notes") { destination = .notes }
                 .accessibilityIdentifier("shotGuide.open")
@@ -568,16 +530,30 @@ struct CameraMovesView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func exampleButton(_ note: ShotNote) -> some View {
-        Button { destination = .example(note.id) } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                Color.clear.aspectRatio(16.0 / 10, contentMode: .fit)
+    private func exampleButton(_ note: ShotNote, photoWidth: CGFloat? = nil, aspect: CGFloat,
+                               featured: Bool = false) -> some View {
+        let layout = photoWidth == nil ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                       : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+        return Button { destination = .example(note.id) } label: {
+            layout {
+                Color.clear.aspectRatio(aspect, contentMode: .fit)
                     .background { SceneImage(name: note.artwork) }
-                    .clipShape(.rect(cornerRadius: 8))
-                LocalizedText(note.shortTitle).font(.capture(.subheadline, weight: .semibold))
+                    .clipShape(.rect(cornerRadius: 12))
+                    .frame(width: photoWidth)
+                HStack(alignment: .center, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        LocalizedText(note.shortTitle).font(.capture(featured ? .title2 : .headline, weight: .semibold))
+                        if featured {
+                            LocalizedText(note.summary).font(.capture(.footnote))
+                                .foregroundStyle(SwevoStyle.secondary)
+                        }
+                    }
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Glyph(symbol: .back, size: 12, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -585,14 +561,20 @@ struct CameraMovesView: View {
     }
 
     private var plannerEntry: some View {
-        let movementLabel = LocalizedText(movement.label).foregroundStyle(SwevoStyle.accent)
         let duration = Text(verbatim: "\(seconds) s").monospacedDigit()
+            .font(.capture(.title, weight: .semibold))
+            .foregroundStyle(SwevoStyle.accent)
             .environment(\.layoutDirection, .leftToRight)
-        let focus = LocalizedText(lockedFocus ? "Focus locked" : "Autofocus")
             .fixedSize(horizontal: false, vertical: true)
+        let settings = VStack(alignment: .leading, spacing: 4) {
+            LocalizedText(movement.label).font(.capture(.subheadline, weight: .semibold))
+            LocalizedText(lockedFocus ? "Focus locked" : "Autofocus").font(.capture(.footnote))
+                .foregroundStyle(SwevoStyle.secondary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
 
         return Button { destination = .planner } label: {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     SceneTitle("Shot planner", size: 24)
                         .accessibilityRemoveTraits(.isHeader)
@@ -602,22 +584,19 @@ struct CameraMovesView: View {
                 }
                 Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 13) {
-                        movementLabel
+                    HStack(spacing: 16) {
                         duration
-                        focus
+                        settings
                     }.fixedSize(horizontal: true, vertical: false)
-                    VStack(alignment: .leading, spacing: 5) {
-                        movementLabel
+                    VStack(alignment: .leading, spacing: 8) {
                         duration
-                        focus
+                        settings
                     }
                 }
-                .font(.capture(.footnote, weight: .semibold))
-                .foregroundStyle(SwevoStyle.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
             .swevoGlass(cornerRadius: 17)
             .contentShape(.interaction, RoundedRectangle(cornerRadius: 17))
         }
@@ -625,11 +604,17 @@ struct CameraMovesView: View {
         .accessibilityIdentifier("cameraMoves.planner")
     }
 
-    private var recordsEntry: some View {
+    private func recordsEntry(showsThumbnail: Bool) -> some View {
         Button { destination = .records } label: {
             HStack(spacing: 12) {
-                Glyph(symbol: .library, size: 20, tint: SwevoStyle.accent)
-                    .frame(width: 32)
+                if showsThumbnail && ArtworkCatalog.has("SceneJournal") {
+                    SceneImage(name: "SceneJournal")
+                        .frame(width: 72, height: 54)
+                        .clipShape(.rect(cornerRadius: 8))
+                } else {
+                    Glyph(symbol: .library, size: 20, tint: SwevoStyle.accent)
+                        .frame(width: 32)
+                }
                 VStack(alignment: .leading, spacing: 4) {
                     LocalizedText("Practice records").font(.capture(.headline))
                         .fixedSize(horizontal: false, vertical: true)
@@ -641,8 +626,11 @@ struct CameraMovesView: View {
                 Glyph(symbol: .back, size: 13, tint: SwevoStyle.secondary)
                     .rotationEffect(.degrees(180))
             }
-            .padding(.vertical, 10)
-            .frame(minHeight: 56)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            .overlay(alignment: .top) {
+                Divider().overlay(SwevoStyle.line).allowsHitTesting(false).accessibilityHidden(true)
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
