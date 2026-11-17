@@ -9,7 +9,7 @@ Open `Swevo.xcodeproj` and select the shared `kstep` scheme for the `Kstep` app 
 ## Service configuration
 
 - The API host is `o4r8xgd.kstep.site` and `getV2.name` is `Swevo`.
-- `Config/Swevo.xcconfig` uses the shared test Bundle ID `im.seex.lobo` pending selection of Kstep’s Bundle ID. The guest login source and business package name derive from it.
+- Builds use the shared test Bundle ID `im.seex.lobo`. The guest login `source` and business `packageName` use `site.kstepchan.motion`.
 - AdMob uses the packaged App ID in `Config/Swevo.xcconfig`. App-open and rewarded units come from `getV2.adList` as Google types `1` and `5` respectively. Each placement's `config.appId` must match the packaged App ID.
 - Membership uses the test product IDs `coins_1.99` and `conis_4.99`. StoreKit supplies the prices and billing periods displayed in the app. Filter the Xcode console by `StoreKitPlans` for a missing or invalid product response.
 - The app links to the [Kstep website](https://www.kstep.site), [privacy policy](https://www.kstep.site/privacy.html), and [terms](https://www.kstep.site/terms.html).
@@ -24,7 +24,7 @@ For playback verification, enter a supported video link or short code from the c
 
 ## Production transition
 
-Debug and Release both inherit `Config/Swevo.xcconfig`. Once the Bundle ID is selected, use it for the signed app and the backend package registration. Verify the StoreKit products for that app and confirm that its backend recognizes Apple Sandbox transactions during App Review.
+Debug and Release both inherit `Config/Swevo.xcconfig`. When switching to production signing, set `PRODUCT_BUNDLE_IDENTIFIER` to `site.kstepchan.motion` and verify the StoreKit products and backend purchase mapping for that app.
 
 In AdMob **Privacy & messaging**, publish the messages for the regions you serve and assign them to the iOS app matching the packaged AdMob App ID. Use Kstep's privacy policy URL in the AdMob message and verify consent and placements with Google test devices. [Google iOS UMP setup](https://developers.google.com/admob/ios/privacy)
 

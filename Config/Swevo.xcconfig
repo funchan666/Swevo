@@ -1,10 +1,10 @@
-// Kstep service configuration. The shared test Bundle ID is pending replacement.
+// Use the shared test Bundle ID for the installed app.
 PRODUCT_BUNDLE_IDENTIFIER = im.seex.lobo
 // getV2 `name`; keep the original capitalisation.
 SWEVO_RELEASE_NAME = Swevo
 SWEVO_API_HOST = o4r8xgd.kstep.site
-// Business packageName and guest-login source.
-SWEVO_SERVICE_PACKAGE_NAME = $(PRODUCT_BUNDLE_IDENTIFIER)
+// Backend identity for business packageName and guest-login source.
+SWEVO_SERVICE_PACKAGE_NAME = site.kstepchan.motion
 // Empty expansion preserves // in xcconfig URL values.
 SWEVO_WEBSITE_URL = https:/$()/www.kstep.site
 SWEVO_PRIVACY_URL = https:/$()/www.kstep.site/privacy.html
