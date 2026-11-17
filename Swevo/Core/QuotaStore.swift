@@ -42,14 +42,23 @@ final class QuotaStore: ObservableObject {
     private var watchLimitPromptClaimed = false
     var unlimited: Bool { isUnlimited(.watch) }
     var downloadsUnlimited: Bool { isUnlimited(.download) }
-    var watchesLeft: Int { max(0, (usage?.watchBaseForDay ?? 0) + (usage?.extraWatches ?? 0) - (usage?.watchSpend ?? usage?.watched.count ?? 0)) }
-    var downloadsLeft: Int { max(0, (usage?.downloadBaseForDay ?? 0) + (usage?.extraDownloads ?? 0) - (usage?.downloadsUsed ?? 0)) }
+    var watchesLeft: Int {
+        let spent = usage?.watchSpend ?? usage?.watched.count ?? 0
+        return max(0, totalAllowance(for: .watch) - spent)
+    }
+    var downloadsLeft: Int { max(0, totalAllowance(for: .download) - (usage?.downloadsUsed ?? 0)) }
     private var downloadReward: Int { max(0, remote?.downloadRewardCount ?? policy?.favoriteReward ?? 0) }
     func isUnlimited(_ kind: AllowanceKind) -> Bool { completedAds(kind) >= 4 }
     func completedAds(_ kind: AllowanceKind) -> Int {
         kind == .watch ? (usage?.completedRewardIDs.count ?? 0) : (usage?.completedDownloadRewardIDs?.count ?? 0)
     }
     func remaining(_ kind: AllowanceKind) -> Int { kind == .watch ? watchesLeft : downloadsLeft }
+    func totalAllowance(for kind: AllowanceKind) -> Int {
+        switch kind {
+        case .watch: (usage?.watchBaseForDay ?? 0) + (usage?.extraWatches ?? 0)
+        case .download: (usage?.downloadBaseForDay ?? 0) + (usage?.extraDownloads ?? 0)
+        }
+    }
     func rewardSummary(for kind: AllowanceKind) -> String {
         if completedAds(kind) >= 3 {
             return kind == .watch ? "Finish this ad for unlimited views today." : "Finish this ad for unlimited downloads today."

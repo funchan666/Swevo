@@ -46,201 +46,296 @@ enum VideoTool: String, Identifiable, CaseIterable {
 
 struct ToolsView: View {
     @EnvironmentObject private var library: LibraryStore
+    @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
+    let openPlus: () -> Void
     @State private var selection: WorkspaceSelection?
 
-    private struct WorkspaceSelection: Identifiable {
-        let id = UUID()
-        let tool: VideoTool
-        let movie: PracticeRecording?
+    private enum WorkspaceSelection: Identifiable {
+        case editor(VideoTool, PracticeRecording?)
+        case comparison(RangeFrameRequest)
+
+        var id: String {
+            switch self {
+            case .editor(let tool, let movie): "\(tool.id)-\(movie?.id.uuidString ?? "choose")"
+            case .comparison(let request): "comparison-\(request.id)"
+            }
+        }
     }
 
     var body: some View {
         let movie = library.movies.lazy.filter { !$0.isAudio }.max { first, second in
             (first.lastOpenedAt ?? .distantPast, first.date) < (second.lastOpenedAt ?? .distantPast, second.date)
         }
-        ScenePage(artwork: movie == nil ? "SceneEdit" : nil, depth: 248, openingGap: 0) { height in
-            opening(movie: movie, height: height)
+        ScenePage(artwork: movie == nil ? "SceneEdit" : nil, depth: movie == nil ? 168 : 44,
+                  openingGap: 0, artworkOpacity: 0.84) { height in
+            VStack(alignment: .leading, spacing: 12) {
+                PlusEntryButton(action: openPlus)
+                if movie == nil {
+                    Spacer(minLength: 16)
+                    chooseVideo
+                }
+            }
+            .frame(minHeight: height, alignment: .top)
         } content: { container in
-            let stacked = typeSize > .xLarge || SwevoStyle.pageContentWidth(in: container) < 320
-                || SwevoStyle.intersectsReservedRegion(CGRect(origin: .zero, size: container.size), in: container)
-            VStack(alignment: .leading, spacing: 18) {
-                rangeAction(movie: movie)
-                quickTools(movie: movie, stacked: stacked)
+            let width = min(640, SwevoStyle.pageContentWidth(in: container))
+            let bounds = CGRect(origin: .zero, size: container.size)
+            let allowsColumns = typeSize <= .xLarge && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+            let sideBySide = movie != nil && allowsColumns && width >= 620
+            let rangeWidth = sideBySide ? (width - 18) / 2 : width
+            let stackedPreview = !allowsColumns || rangeWidth < 300
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 18))
+                                    : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            VStack(alignment: .leading, spacing: 20) {
+                layout {
+                    if let movie { currentVideo(movie) }
+                    rangePanel(movie: movie, stacked: stackedPreview)
+                }
+                quickTools(movie: movie, stacked: !allowsColumns || width < 320)
             }
         }
         .sheet(item: $selection) { selection in
-            EditorSheet(initialMovie: selection.movie, initialTool: selection.tool)
-        }
-    }
-
-    private func opening(movie: PracticeRecording?, height: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            editorAction(movie: movie)
-            if movie != nil {
-                Button {
-                    selection = WorkspaceSelection(tool: .studio, movie: nil)
-                } label: {
-                    HStack(spacing: 8) {
-                        Glyph(symbol: .folder, size: 16, tint: SwevoStyle.accent)
-                        LocalizedText("Change video").font(.capture(.footnote, weight: .semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .foregroundStyle(SwevoStyle.accent)
-                    .padding(.trailing, 8)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(PressStyle())
-            }
-        }
-        .padding(.horizontal, movie == nil ? 0 : 16)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: height, alignment: .bottomLeading)
-        .background {
-            if let movie {
-                VideoFileThumbnail(url: library.url(for: movie), maximumSize: 1080)
-                    .overlay {
-                        LinearGradient(stops: [
-                            .init(color: .clear, location: 0.15),
-                            .init(color: SwevoStyle.background.opacity(0.86), location: 0.65),
-                            .init(color: SwevoStyle.background, location: 1)
-                        ], startPoint: .top, endPoint: .bottom)
-                    }
-                    .allowsHitTesting(false)
+            switch selection {
+            case .editor(let tool, let movie):
+                EditorSheet(initialMovie: movie, initialTool: tool)
+            case .comparison(let request):
+                RangeFrameComparison(request: request)
             }
         }
     }
 
-    private func editorAction(movie: PracticeRecording?) -> some View {
-        Button {
-            selection = WorkspaceSelection(tool: .studio, movie: movie)
-        } label: {
-            HStack(alignment: .bottom, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    if let movie {
-                        LocalizedText(VideoTool.studio.title).font(.capture(.subheadline, weight: .semibold))
-                            .foregroundStyle(SwevoStyle.accent)
-                        Text(verbatim: movie.displayFilename)
-                            .font(.capture(.title2, weight: .semibold))
-                            .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
-                    } else {
-                        SceneTitle(VideoTool.studio.title, size: 42).accessibilityRemoveTraits(.isHeader)
-                        LocalizedText("Choose a video from Photos or Files to start editing.")
-                            .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Glyph(symbol: .edit, size: 24, tint: SwevoStyle.ink)
-                    .frame(width: 56, height: 56)
-                    .background(SwevoStyle.accent, in: Circle())
+    private var chooseVideo: some View {
+        Button { selection = .editor(.studio, nil) } label: {
+            HStack(spacing: 10) {
+                Glyph(symbol: .folder, size: 20, tint: SwevoStyle.ink)
+                LocalizedText("Choose a video").font(.capture(.headline))
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Glyph(symbol: .back, size: 12, tint: SwevoStyle.ink)
+                    .rotationEffect(.degrees(180))
             }
-            .foregroundStyle(SwevoStyle.paper)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .frame(minHeight: 52)
+            .foregroundStyle(SwevoStyle.ink)
+            .background { CaptureSurface(tone: .accent) }
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .accessibilityHint("Choose a video from Photos or Files to start editing.")
         .accessibilityIdentifier("tools.studio")
     }
 
-    private func rangeAction(movie: PracticeRecording?) -> some View {
-        let mark = movie?.rangeMarks?.first { $0.timeRange != nil }
-        return Button {
-            selection = WorkspaceSelection(tool: .ranges, movie: movie)
-        } label: {
-            HStack(spacing: 12) {
-                if let movie, let mark {
-                    VideoFileThumbnail(url: library.url(for: movie), timestamp: mark.start)
-                        .id(mark.id)
-                        .frame(width: 56, height: 44)
-                        .clipShape(.rect(cornerRadius: 8))
-                } else {
-                    Glyph(symbol: .bookmark, size: 20, tint: SwevoStyle.accent)
-                        .frame(width: 44, height: 44)
-                        .background(SwevoStyle.accent.opacity(0.10), in: .rect(cornerRadius: 12))
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    LocalizedText(mark == nil ? VideoTool.ranges.title : "Review saved ranges")
-                        .font(.capture(.headline))
-                    if let mark {
-                        if !mark.name.isEmpty {
-                            Text(verbatim: mark.name).font(.capture(.subheadline))
+    private func currentVideo(_ movie: PracticeRecording) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { selection = .editor(.studio, movie) } label: {
+                VStack(alignment: .leading, spacing: 12) {
+                    VideoFileThumbnail(url: library.url(for: movie), maximumSize: 1080, contentMode: .fit)
+                        .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                        .clipShape(.rect(cornerRadius: 14))
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(verbatim: movie.displayFilename).font(.capture(.headline))
+                                .foregroundStyle(SwevoStyle.paper)
+                            LocalizedText(VideoTool.studio.title).font(.capture(.footnote, weight: .semibold))
+                                .foregroundStyle(SwevoStyle.accent)
                         }
-                        let start = durationLabel(mark.start, fractional: true)
-                        let end = durationLabel(mark.end, fractional: true)
-                        Text(verbatim: "\(start) – \(end)")
-                            .font(.capture(.footnote)).monospacedDigit()
-                            .foregroundStyle(SwevoStyle.secondary)
-                            .environment(\.layoutDirection, .leftToRight)
-                    } else {
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Glyph(symbol: .back, size: 13, tint: SwevoStyle.accent)
+                            .rotationEffect(.degrees(180))
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Edit video")
+            .accessibilityValue(Text(verbatim: movie.displayFilename))
+            .accessibilityIdentifier("tools.studio")
+
+            Button { selection = .editor(.studio, nil) } label: {
+                commandLabel("Change video", symbol: .folder)
+            }
+            .buttonStyle(PressStyle())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func rangePanel(movie: PracticeRecording?, stacked: Bool) -> some View {
+        if let movie, let mark = movie.rangeMarks?.first(where: { $0.timeRange != nil }) {
+            let request = RangeFrameRequest(source: library.url(for: movie), mark: mark)
+            savedRange(request, movie: movie, stacked: stacked)
+        } else {
+            Button { selection = .editor(.ranges, movie) } label: {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        LocalizedText(VideoTool.ranges.title).font(.capture(.title3, weight: .semibold))
+                            .foregroundStyle(SwevoStyle.paper)
                         LocalizedText(VideoTool.ranges.detail).font(.capture(.footnote))
                             .foregroundStyle(SwevoStyle.secondary)
                     }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Glyph(symbol: .bookmark, size: 25, tint: SwevoStyle.accent)
                 }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Glyph(symbol: .back, size: 13, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+                .padding(16)
+                .frame(minHeight: 74)
+                .swevoGlass(cornerRadius: 16)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 10)
-            .foregroundStyle(SwevoStyle.paper)
-            .overlay(alignment: .bottom) {
-                Divider().overlay(SwevoStyle.line).allowsHitTesting(false).accessibilityHidden(true)
-            }
-            .contentShape(Rectangle())
+            .buttonStyle(PressStyle())
+            .accessibilityIdentifier("tools.ranges")
         }
-        .buttonStyle(PressStyle())
-        .accessibilityIdentifier("tools.ranges")
+    }
+
+    private func savedRange(_ request: RangeFrameRequest, movie: PracticeRecording, stacked: Bool) -> some View {
+        let start = durationLabel(request.mark.start, fractional: true)
+        let end = durationLabel(request.mark.end, fractional: true)
+        let review = Button { selection = .editor(.ranges, movie) } label: {
+            commandLabel("Review saved ranges", symbol: .bookmark, primary: true)
+        }.buttonStyle(PressStyle()).accessibilityIdentifier("tools.ranges")
+        let compare = Button { selection = .comparison(request) } label: {
+            commandLabel("Compare 3 frames", symbol: .feed)
+        }.buttonStyle(PressStyle()).accessibilityIdentifier("tools.compareFrames")
+
+        return VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                LocalizedText("Saved ranges").font(.capture(.caption, weight: .semibold))
+                    .foregroundStyle(SwevoStyle.accent)
+                Text(verbatim: request.title(in: AppLanguage.from(locale)))
+                    .font(.capture(.title3, weight: .semibold))
+                Text(verbatim: "\(start) – \(end)").font(.capture(.footnote)).monospacedDigit()
+                    .foregroundStyle(SwevoStyle.secondary)
+                    .environment(\.layoutDirection, .leftToRight)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+
+            RangePreview(request: request, stacked: stacked)
+                .id(request.id)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    review.fixedSize(horizontal: true, vertical: false)
+                    compare.fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    review
+                    compare
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .swevoGlass(cornerRadius: 16)
+    }
+
+    private func commandLabel(_ title: String, symbol: SwevoGlyph, primary: Bool = false) -> some View {
+        HStack(spacing: 7) {
+            Glyph(symbol: symbol, size: 15, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
+            LocalizedText(title).font(.capture(.footnote, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .frame(minWidth: 44, minHeight: 44)
+        .foregroundStyle(primary ? SwevoStyle.ink : SwevoStyle.accent)
+        .background(primary ? SwevoStyle.accent : .clear, in: RoundedRectangle(cornerRadius: 10))
+        .contentShape(Rectangle())
     }
 
     private func quickTools(movie: PracticeRecording?, stacked: Bool) -> some View {
-        let frame = quickTool(.frame, movie: movie, featured: !stacked)
-        let divider = Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
-        let secondaryTools = VStack(spacing: 0) {
-            quickTool(.speed, movie: movie)
-            divider
-            quickTool(.audio, movie: movie)
-        }
-        return Group {
-            if stacked {
-                VStack(spacing: 0) {
-                    frame
-                    divider
-                    secondaryTools
+        let tools: [VideoTool] = [.frame, .speed, .audio]
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(alignment: .top, spacing: 0))
+        let rule = Rectangle().fill(SwevoStyle.line)
+            .frame(width: stacked ? nil : 1, height: stacked ? 1 : nil)
+            .padding(stacked ? .horizontal : .vertical, 8)
+            .allowsHitTesting(false).accessibilityHidden(true)
+        return VStack(spacing: 0) {
+            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+            layout {
+                ForEach(tools) { tool in
+                    quickToolButton(tool, movie: movie, stacked: stacked)
+                    if tool != .audio { rule }
                 }
-            } else {
-                HStack(spacing: 0) {
-                    frame
-                    divider
-                    secondaryTools
-                }
-                .fixedSize(horizontal: false, vertical: true)
             }
+            .fixedSize(horizontal: false, vertical: true)
+            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
         }
-        .swevoGlass(cornerRadius: 20)
     }
 
-    private func quickTool(_ tool: VideoTool, movie: PracticeRecording?, featured: Bool = false) -> some View {
-        let layout = featured ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-                              : AnyLayout(HStackLayout(alignment: .top, spacing: 9))
-        return Button {
-            selection = WorkspaceSelection(tool: tool, movie: movie)
-        } label: {
-            layout {
-                Glyph(symbol: tool.glyph, size: featured ? 30 : 16, tint: SwevoStyle.accent)
-                VStack(alignment: .leading, spacing: 4) {
-                    LocalizedText(tool.title).font(.capture(featured ? .headline : .subheadline, weight: .semibold))
-                    LocalizedText(tool.detail).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-                }
-                .fixedSize(horizontal: false, vertical: true)
+    private func quickToolButton(_ tool: VideoTool, movie: PracticeRecording?, stacked: Bool) -> some View {
+        let label = stacked ? AnyLayout(HStackLayout(spacing: 12))
+                            : AnyLayout(VStackLayout(alignment: .leading, spacing: 9))
+        return Button { selection = .editor(tool, movie) } label: {
+            label {
+                Glyph(symbol: tool.glyph, size: 21, tint: SwevoStyle.accent)
+                LocalizedText(tool.title).font(.capture(stacked ? .subheadline : .footnote, weight: .semibold))
+                    .foregroundStyle(SwevoStyle.paper)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, featured ? 16 : 12)
-            .padding(.vertical, featured ? 16 : 12)
-            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .foregroundStyle(SwevoStyle.paper)
+            .padding(.horizontal, 10).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: stacked ? 50 : 70, alignment: stacked ? .leading : .topLeading)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
+        .accessibilityHint(Text(LocalizedStringKey(tool.detail)))
         .accessibilityIdentifier("tools.\(tool.rawValue)")
+    }
+}
+
+private struct RangePreview: View {
+    let request: RangeFrameRequest
+    let stacked: Bool
+    @State private var frames: [RangeStill] = []
+    @State private var error: String?
+
+    var body: some View {
+        Group {
+            if frames.isEmpty {
+                LocalizedText(error ?? "Reading video frames…")
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+            } else {
+                let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                     : AnyLayout(HStackLayout(alignment: .top, spacing: 6))
+                let cell = stacked ? AnyLayout(HStackLayout(spacing: 10))
+                                   : AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                layout {
+                    ForEach(frames) { frame in
+                        cell {
+                            Image(decorative: frame.image, scale: 1)
+                                .resizable().scaledToFit()
+                                .frame(maxWidth: stacked ? 80 : .infinity)
+                                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                                .background(SwevoStyle.ink)
+                                .clipShape(.rect(cornerRadius: 6))
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                LocalizedText(frame.position.title).font(.capture(.caption, weight: .semibold))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(verbatim: durationLabel(frame.time, fractional: true))
+                                    .font(.capture(.caption)).monospacedDigit().foregroundStyle(SwevoStyle.secondary)
+                                    .environment(\.layoutDirection, .leftToRight)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+        }
+        .task {
+            error = nil
+            do {
+                let result = try await request.readFrames(maximumSize: 360)
+                guard !Task.isCancelled else { return }
+                frames = result
+            } catch {
+                if !Task.isCancelled { self.error = error.localizedDescription }
+            }
+        }
     }
 }
 
@@ -248,10 +343,11 @@ struct EditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     var initialMovie: PracticeRecording? = nil
     var initialTool: VideoTool = .studio
+    var initialLoop: VideoRangeMark? = nil
     var onVideoOpened: ((PracticeRecording) -> Void)? = nil
     @StateObject private var departure = ExportDeparture()
     var body: some View {
-        EditorWorkspace(initialMovie: initialMovie, initialTool: initialTool, onVideoOpened: onVideoOpened) {
+        EditorWorkspace(initialMovie: initialMovie, initialTool: initialTool, initialLoop: initialLoop, onVideoOpened: onVideoOpened) {
             departure.request { dismiss() }
         }
             .environmentObject(departure)
@@ -265,11 +361,18 @@ struct EditorWorkspace: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var ads: RewardedAds
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @FocusState private var editingRangeName: Bool
     let initialTool: VideoTool
     let onVideoOpened: ((PracticeRecording) -> Void)?
     let close: () -> Void
     @StateObject private var editor = VideoEditor()
     @State private var selected: PracticeRecording?
+    @State private var pendingLoop: VideoRangeMark?
+    @State private var activeLoop: VideoRangeMark?
+    @State private var reviewStart: Double?
+    @State private var reviewEnd: Double?
+    @State private var frameComparison: RangeFrameRequest?
     @State private var importing = false
     @State private var error: String?
     @State private var shareURL: SharedFile?
@@ -279,132 +382,117 @@ struct EditorWorkspace: View {
     @State private var playbackScrubbing = false
     @State private var resumePreview = false
     @State private var retryID = UUID()
+    @State private var openedRequest: VideoOpenRequest?
     @State private var tool = "Trim"
+    @State private var showingExportSettings = false
     @State private var exportTask: Task<Void, Never>?
-    private let tools = ["Trim", "Frame", "Speed", "Audio", "Export"]
+    private let tools = ["Trim", "Frame", "Speed", "Audio"]
 
-    init(initialMovie: PracticeRecording? = nil, initialTool: VideoTool = .studio,
+    private var audioOnly: Bool { initialTool == .audio }
+    private var focusesRanges: Bool { initialTool == .ranges }
+    private var rangeStart: Double { focusesRanges ? reviewStart ?? 0 : editor.recipe.start }
+    private var rangeEnd: Double { focusesRanges ? reviewEnd ?? editor.duration : editor.recipe.end }
+    private var previewRange: ClosedRange<Double> {
+        if rangeStart <= rangeEnd { return rangeStart...rangeEnd }
+        return 0...editor.duration
+    }
+    private var editingLocked: Bool {
+        departure.running || editor.isExporting || editor.isPreparingPreview || sharingExport
+    }
+    private var canPlay: Bool {
+        scenePhase == .active && !ads.isPresenting && shareURL == nil
+            && !showingExportMembership && !showingExportSettings && frameComparison == nil
+    }
+    private var operationError: String? {
+        guard !departure.running else { return nil }
+        return error ?? (editor.duration > 0 ? editor.error : nil)
+    }
+
+    init(initialMovie: PracticeRecording? = nil, initialTool: VideoTool = .studio, initialLoop: VideoRangeMark? = nil,
          onVideoOpened: ((PracticeRecording) -> Void)? = nil, close: @escaping () -> Void) {
         self.initialTool = initialTool
         self.onVideoOpened = onVideoOpened
         self.close = close
         _selected = State(initialValue: initialMovie)
+        _pendingLoop = State(initialValue: initialLoop)
+        _reviewStart = State(initialValue: initialLoop?.start)
+        _reviewEnd = State(initialValue: initialLoop?.end)
         _tool = State(initialValue: initialTool.editorTab)
     }
     var body: some View {
         ScrollViewReader { scroll in
-            workspace(scroll).onChange(of: savedExport?.id) { _, id in
-                if let id { scroll.scrollTo(id, anchor: .bottom) }
-            }
+            workspace(scroll)
+                .onChange(of: savedExport?.id) { _, id in
+                    if let id { scroll.scrollTo(id, anchor: .bottom) }
+                }
+                .onChange(of: operationError) { _, message in
+                    if message != nil { scroll.scrollTo("editor-feedback", anchor: .bottom) }
+                }
         }
     }
 
     private func workspace(_ scroll: ScrollViewProxy) -> some View {
-        ScenePage { container in
-            VStack(alignment: .leading, spacing: 24) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        if let selected {
-                            Text(verbatim: selected.displayFilename).font(.capture(.headline))
-                                .fixedSize(horizontal: false, vertical: true)
-                            changeVideo
-                        } else {
-                            LocalizedText(initialTool.detail).font(.capture(.subheadline))
-                                .foregroundStyle(SwevoStyle.secondary).fixedSize(horizontal: false, vertical: true)
+        let openRequest = VideoOpenRequest(movieID: selected?.id, retryID: retryID)
+        return GeometryReader { container in
+            let width = SwevoStyle.pageContentWidth(in: container)
+            let bounds = CGRect(origin: .zero, size: container.size)
+            let besidePreview = width >= 1000 && typeSize <= .xLarge
+                && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+            let stacked = width < 340 || typeSize > .xLarge
+            let layout = besidePreview ? AnyLayout(HStackLayout(alignment: .top, spacing: 8))
+                                       : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            let height = focusesRanges
+                ? min(420, max(112, container.size.height * 0.42))
+                : min(580, max(120, container.size.height * 0.59))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header(stacked: stacked).pageHorizontalMargins().id("editor-top")
+                    if let selected {
+                        layout {
+                            previewStage(height: height, stacked: stacked, scroll: scroll)
+                            if editor.duration > 0 {
+                                inspector(for: selected, stackedTrim: stacked || besidePreview, scroll: scroll)
+                                    .frame(maxWidth: besidePreview ? 318 : .infinity, alignment: .leading)
+                                    .pageHorizontalMargins()
+                            }
                         }
+                    } else {
+                        importContent(in: container).pageHorizontalMargins()
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    IconButton(symbol: .close, label: "Close", action: close)
-                        .swevoGlass(cornerRadius: 22).disabled(importing)
                 }
-                if let selected {
-                    let canPlay = scenePhase == .active && !ads.isPresenting && shareURL == nil && !showingExportMembership
-                    let canMarkRange = canPlay && !departure.running && !editor.isPreparingPreview && !sharingExport
-                    VStack(alignment: .leading, spacing: 8) {
-                        VideoSurface(player: editor.preview.player, fill: false)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: min(470, max(150, container.size.height * 0.48)))
-                            .background(.black)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        VideoPlaybackControls(playback: editor.preview, timeline: editor.preview.timeline,
-                                              enabled: canPlay && editor.duration > 0 && !editor.isPreparingPreview && !departure.running,
-                                              canResume: canPlay,
-                                              scrubbing: $playbackScrubbing, retry: editor.retryPlayback)
-                    }.id("editor-preview")
-                    if editor.isLoading {
-                        LocalizedText("Preparing your video…").foregroundStyle(SwevoStyle.secondary)
-                    } else if editor.duration <= 0, let error = editor.error {
-                        ErrorNote(message: error)
-                        ActionButton(title: "Retry", primary: false) { retryID = UUID() }
-                    }
-                    if editor.isPreparingPreview { AccountLoadingIndicator(title: "Preparing preview…").frame(maxWidth: .infinity) }
-                    if editor.duration > 0 {
-                        if initialTool == .studio {
-                            ChoiceStrip(values: tools, selected: tool) { tool = $0 }
-                        }
-                        controls.id("editor-adjustments")
-                            .disabled(departure.running || editor.isExporting || editor.isPreparingPreview || sharingExport)
-                        if let error = editor.error { ErrorNote(message: error) }
-                        if initialTool == .ranges {
-                            ranges(for: selected, scroll: scroll).disabled(!canMarkRange)
-                        }
-                    }
-                    if departure.running {
-                        VStack(spacing: 14) {
-                            LocalizedText(editor.isExporting ? "Exporting · \(Int(editor.progress * 100))%" : "Preparing export…")
-                                .font(.capture(.subheadline)).monospacedDigit()
-                            GeometryReader { geometry in
-                                Color.clear.background(SwevoStyle.raised)
-                                    .overlay(alignment: .leading) { SwevoStyle.accent.frame(width: geometry.size.width * CGFloat(editor.progress)) }
-                            }.frame(height: 4)
-                            ActionButton(title: "Cancel export", primary: false) { departure.request() }
-                        }
-                    } else if editor.duration > 0 {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ActionButton(title: initialTool == .audio ? "Export audio as M4A" : "Export video") {
-                                export(audio: initialTool == .audio, title: selected.title)
-                            }
-                            if initialTool != .audio {
-                                ActionButton(title: "Preview changes", primary: false) { Task { await editor.applyPreview() } }
-                            }
-                        }
-                        .disabled(editor.isPreparingPreview || sharingExport)
-                    }
-                    if let error { ErrorNote(message: error) }
-                    if let savedExport {
-                        SavedVideoExport(movie: savedExport, sharing: sharingExport, disabled: departure.running) {
-                            shareExport(savedExport)
-                        }.id(savedExport.id)
-                    }
-                    if initialTool == .studio, tool == "Trim", editor.duration > 0 {
-                        ranges(for: selected, scroll: scroll).disabled(!canMarkRange)
-                    }
-                } else {
-                    importPrompt
-                    if let error { ErrorNote(message: error) }
-                    if !library.importedMovies.isEmpty {
-                        SectionLabel(title: "Recent imports")
-                        LazyVStack(spacing: 4) {
-                            ForEach(library.importedMovies) { movie in
-                                VideoFileButton(url: library.url(for: movie), filename: movie.displayFilename, date: movie.date) {
-                                    choose(movie)
-                                }.disabled(importing)
-                            }
-                        }
-                    }
+                .padding(.top, 8).padding(.bottom, 20)
+                .frame(maxWidth: selected == nil ? 680 : (besidePreview ? 1140 : 820))
+                .frame(maxWidth: .infinity, alignment: .top)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let selected, editor.duration > 0, !editingRangeName, !focusesRanges {
+                    exportDock(for: selected)
                 }
             }
-        }
-            .interactiveDismissDisabled(importing || departure.running)
             .scrollDismissesKeyboard(.interactively)
+        }
+            .swevoScreenBackground()
+            .foregroundStyle(SwevoStyle.paper)
+            .dismissKeyboardOnOutsideTap($editingRangeName, scope: "editor-range-name")
+            .interactiveDismissDisabled(importing || departure.running)
             .sheet(item: $shareURL) { ShareSheet(items: [$0.url]) }
-            .sheet(isPresented: $showingExportMembership) { MembershipView(exportRequired: true) }
-            .task(id: VideoOpenRequest(movieID: selected?.id, retryID: retryID)) {
-                guard let selected else { return }
+            .fullScreenCover(isPresented: $showingExportMembership) { MembershipView(exportRequired: true) }
+            .sheet(isPresented: $showingExportSettings) { exportSettings }
+            .sheet(item: $frameComparison) { request in RangeFrameComparison(request: request) }
+            .onChange(of: selected?.id) { _, _ in
+                activeLoop = nil
+                reviewStart = nil
+                reviewEnd = nil
+                scroll.scrollTo("editor-top", anchor: .top)
+            }
+            .task(id: openRequest) {
+                guard let selected, openedRequest != openRequest else { return }
                 playbackScrubbing = false
                 await editor.open(library.url(for: selected)) {
+                    openedRequest = openRequest
                     library.markOpened(selected)
                     onVideoOpened?(selected)
+                    playPendingLoop()
                 }
             }
             .onChange(of: scenePhase) { _, phase in
@@ -415,22 +503,203 @@ struct EditorWorkspace: View {
                 if presenting { interruptPreview() } else { resumePreviewIfPossible() }
             }
             .onChange(of: showingExportMembership) { _, presenting in if presenting { editor.preview.pause() } }
-            .onDisappear { editor.close(); exportTask?.cancel(); shareTask?.cancel() }
+            .onDisappear {
+                guard !showingExportMembership else { return }
+                openedRequest = nil
+                editor.close()
+                exportTask?.cancel()
+                shareTask?.cancel()
+            }
+    }
+
+    private func header(stacked: Bool) -> some View {
+        let fileLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                                 : AnyLayout(HStackLayout(spacing: 8))
+        return HStack(alignment: .top, spacing: 8) {
+            if let selected {
+                fileLayout {
+                    Text(verbatim: selected.displayFilename)
+                        .font(.capture(.headline))
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+                        .truncationMode(.middle)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    changeVideo
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    SceneTitle("Choose a video", size: 32)
+                    if let pickerToolTitle {
+                        LocalizedText(pickerToolTitle).font(.capture(.subheadline, weight: .medium))
+                            .foregroundStyle(SwevoStyle.accent)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            IconButton(symbol: .close, label: "Close", action: close)
+                .swevoGlass(cornerRadius: 22).disabled(importing)
+        }
+    }
+
+    private var pickerToolTitle: String? {
+        if audioOnly || focusesRanges { return initialTool.title }
+        return tool == VideoTool.studio.editorTab ? nil : tool
+    }
+
+    private func importContent(in container: GeometryProxy) -> some View {
+        let recentImports = library.importedMovies.filter { !$0.isAudio }
+        let width = min(640, SwevoStyle.pageContentWidth(in: container))
+        let bounds = CGRect(origin: .zero, size: container.size)
+        let allowsColumns = !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+        let stackedSources = width < 300 || !allowsColumns || typeSize > .xLarge
+        let tiled = width >= 330 && allowsColumns && typeSize <= .large && recentImports.count > 1
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .topLeading), count: tiled ? 2 : 1)
+
+        return VStack(alignment: .leading, spacing: 20) {
+            VideoImportActions(onImported: choose, importing: $importing,
+                               presentation: .sourcePair(stacked: stackedSources))
+            if let error { ErrorNote(message: error).id("editor-feedback") }
+            VStack(alignment: .leading, spacing: 12) {
+                Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+                SectionLabel(title: "Recent imports")
+                    .accessibilityAddTraits(.isHeader)
+                if recentImports.isEmpty {
+                    if let libraryError = library.error {
+                        ErrorNote(message: libraryError)
+                    } else {
+                        EmptyStateScene(artwork: "SceneEdit", message: "No imported videos yet",
+                                        container: container, columnWidth: width, maxArtworkHeight: 132)
+                    }
+                } else {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: tiled ? 16 : 4) {
+                        ForEach(recentImports) { movie in
+                            VideoFileButton(url: library.url(for: movie), filename: movie.displayFilename,
+                                            date: movie.date, presentation: .picker(tiled: tiled)) {
+                                choose(movie)
+                            }
+                            .disabled(importing)
+                            .accessibilityIdentifier("editor.pick.\(movie.id)")
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func previewStage(height: CGFloat, stacked: Bool, scroll: ScrollViewProxy) -> some View {
+        let compareLoop = activeLoop.map { mark in { compareRange(mark) } }
+        let marks = library.movies.first { $0.id == selected?.id }?.rangeMarks ?? []
+        let hasSavedRanges = marks.contains { ($0.timeRange?.upperBound ?? .infinity) <= editor.duration }
+        let rangeTarget = hasSavedRanges ? "editor-saved-ranges" : "editor-ranges"
+        return VStack(alignment: .leading, spacing: 8) {
+            VideoSurface(player: editor.preview.player, fill: false)
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+                .background(SwevoStyle.surface.opacity(0.42))
+                .overlay {
+                    if editor.isLoading || editor.isPreparingPreview {
+                        AccountLoadingIndicator(title: editor.isLoading ? "Preparing your video…" : "Preparing preview…")
+                            .padding(12)
+                            .background(SwevoStyle.background.opacity(0.92), in: RoundedRectangle(cornerRadius: 14))
+                            .allowsHitTesting(false)
+                    }
+                }
+            if editor.duration > 0 {
+                VideoPlaybackControls(playback: editor.preview, timeline: editor.preview.timeline,
+                                      enabled: canPlay && !editingLocked,
+                                      canResume: canPlay && !editingLocked,
+                                      scrubbing: $playbackScrubbing, retry: editor.retryPlayback,
+                                      sourceFrames: editor.isShowingSource ? editor.thumbnails : nil,
+                                      sourceDuration: editor.duration,
+                                      trim: previewRange,
+                                      compareLoop: compareLoop,
+                                      rangesTitle: hasSavedRanges ? "Saved ranges" : "Mark a range",
+                                      openRanges: audioOnly || (focusesRanges && !hasSavedRanges) ? nil : {
+                        scroll.scrollTo(rangeTarget, anchor: .top)
+                    })
+                    .pageHorizontalMargins()
+                if focusesRanges {
+                    ReviewRangeMarkers(playback: editor.preview, duration: editor.duration,
+                                       start: $reviewStart, end: $reviewEnd, stacked: stacked,
+                                       restoreOriginal: editor.isShowingSource ? nil : {
+                        editor.preview.pause()
+                        editor.restoreSourcePreview(seekTo: rangeStart)
+                    })
+                    .disabled(!canPlay || editingLocked || playbackScrubbing)
+                    .pageHorizontalMargins()
+                }
+            } else if !editor.isLoading, let error = editor.error {
+                VStack(alignment: .leading, spacing: 6) {
+                    ErrorNote(message: error)
+                    EditorCommand(title: "Retry") { retryID = UUID() }
+                }
+                .pageHorizontalMargins()
+            }
+        }
+        .id("editor-preview")
+    }
+
+    private func inspector(for movie: PracticeRecording, stackedTrim: Bool, scroll: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if focusesRanges { ranges(for: movie, scroll: scroll) }
+            VStack(alignment: .leading, spacing: 12) {
+                if !audioOnly { toolPicker }
+                controls(stackedTrim: stackedTrim).id("editor-adjustments")
+                if !audioOnly {
+                    EditorCommand(title: "Preview changes", symbol: .play) {
+                        editingRangeName = false
+                        scroll.scrollTo("editor-preview", anchor: .top)
+                        Task { await editor.applyPreview() }
+                    }.swevoGlass()
+                }
+            }.disabled(editingLocked)
+            if let operationError {
+                ErrorNote(message: operationError).id("editor-feedback")
+            }
+            if let savedExport {
+                SavedVideoExport(movie: savedExport, sharing: sharingExport, disabled: departure.running) {
+                    shareExport(savedExport)
+                }.id(savedExport.id)
+            }
+            if focusesRanges {
+                exportControls(for: movie)
+            } else if !audioOnly {
+                ranges(for: movie, scroll: scroll)
+            }
+        }
     }
 
     private func ranges(for movie: PracticeRecording, scroll: ScrollViewProxy) -> some View {
         VideoRangePanel(playback: editor.preview, movieID: movie.id, duration: editor.duration,
-                        start: editor.recipe.start, end: editor.recipe.end, primary: initialTool == .ranges,
-                        playRange: { range in
+                        start: rangeStart, end: rangeEnd, saveAndLoop: focusesRanges, activeLoopID: activeLoop?.id,
+                        editingName: $editingRangeName, compareRange: compareRange,
+                        playRange: { mark in
+            guard let range = mark.timeRange else { return }
+            activeLoop = mark
             editor.playRange(range)
             scroll.scrollTo("editor-preview", anchor: .top)
         }, trimToRange: { range in
             editor.preview.pause()
-            editor.recipe.start = range.lowerBound
-            editor.recipe.end = range.upperBound
+            var recipe = editor.recipe
+            recipe.start = range.lowerBound
+            recipe.end = range.upperBound
+            editor.recipe = recipe
             editor.restoreSourcePreview(seekTo: range.lowerBound)
+            tool = "Trim"
             scroll.scrollTo("editor-adjustments", anchor: .top)
-        }).id(movie.id)
+        })
+        .id(movie.id)
+        .disabled(!canPlay || editingLocked)
+        .id("editor-ranges")
+    }
+
+    private func compareRange(_ mark: VideoRangeMark) {
+        guard let selected, canPlay, !editingLocked else { return }
+        editingRangeName = false
+        editor.preview.pause()
+        frameComparison = RangeFrameRequest(source: library.url(for: selected), mark: mark)
     }
 
     private func interruptPreview() {
@@ -439,87 +708,274 @@ struct EditorWorkspace: View {
     }
 
     private func resumePreviewIfPossible() {
+        playPendingLoop()
         guard resumePreview, scenePhase == .active, !ads.isPresenting else { return }
         resumePreview = false
-        guard selected != nil, shareURL == nil, !showingExportMembership, !departure.running else { return }
+        guard selected != nil, canPlay, !departure.running else { return }
         editor.preview.play()
     }
 
-    private var importPrompt: some View {
-        VideoImportActions(onImported: choose, importing: $importing)
+    private func playPendingLoop() {
+        guard let mark = pendingLoop, editor.duration > 0, canPlay, !editingLocked else { return }
+        pendingLoop = nil
+        guard let range = mark.timeRange, range.upperBound <= editor.duration else {
+            error = "This range no longer fits the video."
+            return
+        }
+        activeLoop = mark
+        editor.playRange(range)
     }
 
     @ViewBuilder private var changeVideo: some View {
-        if !departure.running, !editor.isExporting, !editor.isPreparingPreview, !sharingExport {
-            Button {
+        if !editingLocked {
+            EditorCommand(title: "Change video", symbol: .folder) {
+                editingRangeName = false
                 selected = nil
+                pendingLoop = nil
                 error = nil
                 savedExport = nil
                 editor.close()
-            } label: {
-                LocalizedText("Change video")
-                    .font(.capture(.footnote, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .foregroundStyle(SwevoStyle.accent)
-                    .contentShape(Rectangle())
-            }.buttonStyle(PressStyle())
+            }
         }
     }
 
-    @ViewBuilder private var controls: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            switch tool {
-            case "Trim":
-                if !editor.thumbnails.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 2) {
-                            ForEach(Array(editor.thumbnails.enumerated()), id: \.offset) { _, image in
-                                Image(uiImage: image).resizable().scaledToFill().frame(width: 42, height: 64).clipped()
-                            }
+    private var toolPicker: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 2) { toolTabs(stacked: false) }
+            VStack(alignment: .leading, spacing: 2) { toolTabs(stacked: true) }
+        }
+        .padding(4)
+        .swevoGlass(cornerRadius: 14)
+    }
+
+    private func toolTabs(stacked: Bool) -> some View {
+        ForEach(tools, id: \.self) { value in
+            let selected = tool == value
+            Button {
+                editingRangeName = false
+                tool = value
+            } label: {
+                LocalizedText(value)
+                    .font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: !stacked, vertical: true)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: stacked ? .leading : .center)
+                    .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
+                    .overlay(alignment: stacked ? .leading : .bottom) {
+                        if selected {
+                            Capsule().fill(SwevoStyle.accent)
+                                .frame(width: stacked ? 2 : 24, height: stacked ? 18 : 2)
+                                .allowsHitTesting(false).accessibilityHidden(true)
                         }
-                    }.clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                HStack { LocalizedText("Start"); Spacer(); Text(verbatim: durationLabel(editor.recipe.start, fractional: true)).monospacedDigit() }
-                SwevoScrubber(value: Binding(get: { editor.recipe.start }, set: {
-                    editor.recipe.start = max(0, min($0, editor.recipe.end - 0.1))
-                    editor.restoreSourcePreview(seekTo: editor.recipe.start)
-                }), range: 0...max(0.1, editor.duration), label: "Trim start")
-                HStack { LocalizedText("End"); Spacer(); Text(verbatim: durationLabel(editor.recipe.end, fractional: true)).monospacedDigit() }
-                SwevoScrubber(value: Binding(get: { editor.recipe.end }, set: {
-                    editor.recipe.end = min(editor.duration, max($0, editor.recipe.start + 0.1))
-                    editor.restoreSourcePreview(seekTo: editor.recipe.end)
-                }), range: 0...max(0.1, editor.duration), label: "Trim end")
-                LocalizedText("Final duration · \(durationLabel((editor.recipe.end - editor.recipe.start) / editor.recipe.speed))").font(.capture(.footnote)).foregroundStyle(SwevoStyle.accent)
+                    }
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+    }
+
+    private func controls(stackedTrim: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            switch tool {
             case "Frame":
-                LocalizedText("Framing").font(.capture(.title3, weight: .bold))
+                toolHeading("Framing")
                 FlowChoices(values: VideoFrame.allCases.map(\.rawValue), selected: editor.recipe.frame.rawValue) { value in editor.recipe.frame = VideoFrame(rawValue: value) ?? .original }
-                ActionButton(title: "Rotate 90° · \((editor.recipe.quarterTurns % 4) * 90)°", primary: false) { editor.recipe.quarterTurns = (editor.recipe.quarterTurns + 1) % 4 }
-                ActionButton(title: editor.recipe.mirrored ? "Mirror: On" : "Mirror: Off", primary: false) { editor.recipe.mirrored.toggle() }
-                LocalizedText("Swevo crops from the center. Tap Preview changes to check the framing.")
-                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                framingActions
+                toolNote("Kstep crops from the center. Tap Preview changes to check the framing.")
             case "Speed":
-                LocalizedText("Video speed").font(.capture(.title3, weight: .bold))
+                toolHeading("Video speed")
                 FlowChoices(values: ["0.5×", "0.75×", "1×", "1.5×", "2×"], selected: String(format: "%g×", editor.recipe.speed)) { value in editor.recipe.speed = Double(value.replacingOccurrences(of: "×", with: "")) ?? 1 }
+                finalDuration
             case "Audio":
-                if initialTool == .audio {
-                    LocalizedText("Audio track").font(.capture(.title3, weight: .bold))
-                    LocalizedText("Export this video’s audio as an M4A file. The video must contain an audio track.")
-                        .font(.capture(.subheadline)).foregroundStyle(SwevoStyle.secondary)
+                if audioOnly {
+                    toolHeading("Audio track")
+                    toolNote("Export this video’s audio as an M4A file. The video must contain an audio track.")
                 } else {
-                    LocalizedText("Video sound").font(.capture(.title3, weight: .bold))
-                    ActionButton(title: editor.recipe.muted ? "Audio: Muted" : "Audio: Original", primary: false) { editor.recipe.muted.toggle() }
-                    ActionButton(title: "Extract audio as M4A", primary: false) { export(audio: true, title: selected?.title ?? "Audio") }
-                    LocalizedText("Audio extraction uses your trim and speed settings.").font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    toolHeading("Video sound")
+                    EditorCommand(title: editor.recipe.muted ? "Audio: Muted" : "Audio: Original",
+                                  symbol: editor.recipe.muted ? .mute : .sound) { editor.recipe.muted.toggle() }
+                    EditorCommand(title: "Extract audio as M4A", symbol: .download) {
+                        editingRangeName = false
+                        export(audio: true, title: selected?.title ?? "Audio")
+                    }
+                    toolNote("Audio extraction uses your trim and speed settings.")
                 }
             default:
-                LocalizedText("Export settings").font(.capture(.title3, weight: .bold))
-                FlowChoices(values: ExportQuality.allCases.map(\.rawValue), selected: editor.recipe.quality.rawValue) { value in editor.recipe.quality = ExportQuality(rawValue: value) ?? .full }
-                LocalizedText("MP4 · Up to the selected resolution · 30 fps\nSmaller resolutions reduce export size. Source videos are never upscaled.").font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                trimControls(stacked: stackedTrim)
+                finalDuration
             }
-        }.padding(22).background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 20))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 16))
     }
+
+    private func trimControls(stacked: Bool) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                             : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
+        return layout {
+            trimPoint("Start", label: "Trim start", value: Binding(get: { editor.recipe.start }, set: {
+                editor.recipe.start = max(0, min($0, editor.recipe.end - 0.1))
+                editor.restoreSourcePreview(seekTo: editor.recipe.start)
+            }))
+            trimPoint("End", label: "Trim end", value: Binding(get: { editor.recipe.end }, set: {
+                editor.recipe.end = min(editor.duration, max($0, editor.recipe.start + 0.1))
+                editor.restoreSourcePreview(seekTo: editor.recipe.end)
+            }))
+        }
+    }
+
+    private func trimPoint(_ title: String, label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            LocalizedText(title).font(.capture(.footnote, weight: .semibold))
+                .foregroundStyle(SwevoStyle.secondary)
+            Text(verbatim: durationLabel(value.wrappedValue, fractional: true))
+                .font(.capture(.title3, weight: .semibold)).monospacedDigit()
+                .environment(\.layoutDirection, .leftToRight)
+            SwevoScrubber(value: value, range: 0...max(0.1, editor.duration), label: label, showsPlayhead: true)
+                .background(alignment: .center) { Capsule().fill(SwevoStyle.line).frame(height: 4) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var framingActions: some View {
+        let rotate = EditorCommand(title: "Rotate 90° · \((editor.recipe.quarterTurns % 4) * 90)°") {
+            editor.recipe.quarterTurns = (editor.recipe.quarterTurns + 1) % 4
+        }
+        let mirror = EditorCommand(title: editor.recipe.mirrored ? "Mirror: On" : "Mirror: Off") {
+            editor.recipe.mirrored.toggle()
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                rotate.fixedSize()
+                mirror.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                rotate
+                mirror
+            }
+        }
+    }
+
+    private var finalDuration: some View {
+        LocalizedText("Final duration · \(durationLabel((editor.recipe.end - editor.recipe.start) / editor.recipe.speed))")
+            .font(.capture(.footnote, weight: .semibold))
+            .foregroundStyle(SwevoStyle.accent)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func toolHeading(_ title: String) -> some View {
+        LocalizedText(title).font(.capture(.headline))
+            .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
+    }
+
+    private func toolNote(_ message: String) -> some View {
+        LocalizedText(message).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func exportDock(for movie: PracticeRecording) -> some View {
+        exportControls(for: movie)
+            .padding(6)
+            .frame(maxWidth: 640)
+            .swevoGlass(cornerRadius: 16)
+            .pageHorizontalMargins()
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
+            .swevoScreenBackground()
+    }
+
+    private func exportControls(for movie: PracticeRecording) -> some View {
+        let command = EditorCommand(title: audioOnly ? "Export audio as M4A" : "Export video",
+                                    symbol: .download, emphasized: true, expanded: true) {
+            export(audio: audioOnly, title: movie.title)
+        }
+        let settings = EditorCommand(title: editor.recipe.quality.rawValue, symbol: .settings) {
+            editor.preview.pause()
+            showingExportSettings = true
+        }
+        .accessibilityLabel("Export settings")
+        .accessibilityValue(Text(verbatim: editor.recipe.quality.rawValue))
+        .accessibilityIdentifier("editor.exportSettings")
+
+        return Group {
+            if departure.running {
+                exportProgress
+            } else {
+                Group {
+                    if audioOnly {
+                        command
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 8) {
+                                settings.fixedSize()
+                                command.fixedSize(horizontal: false, vertical: true)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                command
+                                settings
+                            }
+                        }
+                    }
+                }.disabled(editingLocked)
+            }
+        }
+    }
+
+    private var exportProgress: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    exportStatus.fixedSize()
+                    Spacer(minLength: 0)
+                    EditorCommand(title: "Cancel export") { departure.request() }.fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    exportStatus
+                    EditorCommand(title: "Cancel export") { departure.request() }
+                }
+            }
+            GeometryReader { geometry in
+                Capsule().fill(SwevoStyle.line)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(SwevoStyle.accent)
+                            .frame(width: geometry.size.width * CGFloat(min(1, max(0, editor.progress))))
+                    }
+            }
+            .frame(height: 4).padding(.horizontal, 8).padding(.bottom, 5)
+            .environment(\.layoutDirection, .leftToRight)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private var exportStatus: some View {
+        LocalizedText(editor.isExporting ? "Exporting · \(Int(editor.progress * 100))%" : "Preparing export…")
+            .font(.capture(.subheadline)).monospacedDigit()
+            .padding(.horizontal, 8)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var exportSettings: some View {
+        ScenePage { _ in
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 8) {
+                    SceneTitle("Export settings", size: 28)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    IconButton(symbol: .close, label: "Close") { showingExportSettings = false }
+                        .swevoGlass(cornerRadius: 22)
+                }
+                FlowChoices(values: ExportQuality.allCases.map(\.rawValue), selected: editor.recipe.quality.rawValue) { value in
+                    editor.recipe.quality = ExportQuality(rawValue: value) ?? .full
+                }
+                toolNote("MP4 · Up to the selected resolution · 30 fps\nSmaller resolutions reduce export size. Source videos are never upscaled.")
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     private func choose(_ movie: PracticeRecording) {
+        openedRequest = nil
         selected = movie
         error = nil
         savedExport = nil
@@ -562,6 +1018,29 @@ struct EditorWorkspace: View {
     }
 }
 
+private struct EditorCommand: View {
+    let title: String
+    var symbol: SwevoGlyph? = nil
+    var emphasized = false
+    var expanded = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                if let symbol { Glyph(symbol: symbol, size: 16, tint: emphasized ? SwevoStyle.ink : SwevoStyle.accent) }
+                LocalizedText(title).font(.capture(.footnote, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .frame(minWidth: 44, maxWidth: expanded ? .infinity : nil, minHeight: 44)
+            .foregroundStyle(emphasized ? SwevoStyle.ink : SwevoStyle.accent)
+            .background(emphasized ? SwevoStyle.accent : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(Rectangle())
+        }.buttonStyle(PressStyle())
+    }
+}
+
 struct SavedVideoExport: View {
     let movie: PracticeRecording
     let sharing: Bool
@@ -586,61 +1065,142 @@ private struct VideoOpenRequest: Equatable {
     let retryID: UUID
 }
 
+private struct ReviewRangeMarkers: View {
+    @ObservedObject var playback: PlaybackController
+    let duration: Double
+    @Binding var start: Double?
+    @Binding var end: Double?
+    let stacked: Bool
+    let restoreOriginal: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LocalizedText("Mark a range").font(.capture(.headline))
+                .accessibilityAddTraits(.isHeader)
+            if let restoreOriginal {
+                EditorCommand(title: "Show original", symbol: .play, action: restoreOriginal)
+                    .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 10))
+            } else {
+                LocalizedText("Scrub to a frame, then set the start or end.")
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                let layout = stacked ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 8))
+                layout {
+                    marker("Set start", time: start ?? 0, binding: $start)
+                        .accessibilityIdentifier("video.range.setStart")
+                    marker("Set end", time: end ?? duration, binding: $end)
+                        .accessibilityIdentifier("video.range.setEnd")
+                }
+                .disabled(playback.isLoading || playback.error != nil)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func marker(_ title: String, time: Double, binding: Binding<Double?>) -> some View {
+        Button {
+            let time = playback.player.currentTime().seconds
+            guard time.isFinite else { return }
+            playback.pause()
+            binding.wrappedValue = min(duration, max(0, time))
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                LocalizedText(title).font(.capture(.footnote, weight: .semibold))
+                    .foregroundStyle(SwevoStyle.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: durationLabel(time, fractional: true)).monospacedDigit()
+                    .font(.capture(.subheadline, weight: .semibold))
+                    .environment(\.layoutDirection, .leftToRight)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct VideoRangePanel: View {
     @EnvironmentObject private var library: LibraryStore
+    @Environment(\.locale) private var locale
     @ObservedObject var playback: PlaybackController
     let movieID: UUID
     let duration: Double
     let start: Double
     let end: Double
-    let primary: Bool
-    let playRange: (ClosedRange<Double>) -> Void
+    let saveAndLoop: Bool
+    let activeLoopID: UUID?
+    let editingName: FocusState<Bool>.Binding
+    let compareRange: (VideoRangeMark) -> Void
+    let playRange: (VideoRangeMark) -> Void
     let trimToRange: (ClosedRange<Double>) -> Void
     @State private var name = ""
     @State private var error: String?
-    @State private var frameRequest: RangeFrameRequest?
-    @FocusState private var editingName: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Range name (optional)", text: $name)
-                .font(.capture(.subheadline)).swevoField()
-                .focused($editingName).submitLabel(.done)
-                .onSubmit { saveRange() }
-                .accessibilityIdentifier("video.range.name")
-            rangeCommand("Save range", symbol: .bookmark, emphasized: primary, action: saveRange)
-                .accessibilityIdentifier("video.range.save")
+        let movie = library.movies.first { $0.id == movieID }
+        let marks = (movie?.rangeMarks ?? []).filter { ($0.timeRange?.upperBound ?? .infinity) <= duration }
+        return VStack(alignment: .leading, spacing: 12) {
+            if marks.isEmpty && !saveAndLoop {
+                LocalizedText("Mark a range to loop it and compare frames.")
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            makeRange
             if let error { ErrorNote(message: error) }
-            if let movie = library.movies.first(where: { $0.id == movieID }), let marks = movie.rangeMarks, !marks.isEmpty {
-                SectionLabel(title: "Saved ranges").accessibilityAddTraits(.isHeader)
-                LazyVStack(alignment: .leading, spacing: 12) {
+            if let movie, !marks.isEmpty {
+                LocalizedText("Saved ranges").font(.capture(.headline))
+                    .accessibilityAddTraits(.isHeader)
+                    .id("editor-saved-ranges")
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(marks) { mark in
-                        if let range = mark.timeRange, range.upperBound <= duration {
+                        if let range = mark.timeRange {
                             rangeRow(mark, range: range, url: library.url(for: movie))
                         }
                     }
                 }
             }
-        }.sheet(item: $frameRequest) { request in RangeFrameComparison(request: request) }
+        }
+    }
+
+    private var makeRange: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !saveAndLoop {
+                LocalizedText("Trim").font(.capture(.caption, weight: .semibold))
+                    .foregroundStyle(SwevoStyle.secondary)
+                timeRange(start: start, end: end)
+                    .font(.capture(.subheadline, weight: .semibold)).foregroundStyle(SwevoStyle.paper)
+            }
+            TextField("Range name (optional)", text: $name,
+                      prompt: Text("Range name (optional)").foregroundStyle(SwevoStyle.secondary))
+                .font(.capture(.subheadline)).swevoField()
+                .focused(editingName).submitLabel(.done)
+                .onSubmit { saveRange() }
+                .keyboardInputRegion("editor-range-name")
+                .accessibilityIdentifier("video.range.name")
+            EditorCommand(title: saveAndLoop ? "Save and loop" : "Save range",
+                          symbol: saveAndLoop ? .play : .bookmark, emphasized: true, expanded: saveAndLoop,
+                          action: saveRange)
+                .accessibilityIdentifier("video.range.save")
+        }
+        .padding(12).swevoGlass(cornerRadius: 14)
     }
 
     private func rangeRow(_ mark: VideoRangeMark, range: ClosedRange<Double>, url: URL) -> some View {
-        let isLooping = playback.repeatedRange == range
-        let startText = durationLabel(mark.start, fractional: true)
-        let endText = durationLabel(mark.end, fractional: true)
+        let isLooping = activeLoopID == mark.id && playback.repeatedRange == range
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
                 VideoFileThumbnail(url: url, timestamp: mark.start)
-                    .frame(width: 58, height: 40).clipShape(.rect(cornerRadius: 6))
+                    .frame(width: 76, height: 50).clipShape(.rect(cornerRadius: 6))
                 VStack(alignment: .leading, spacing: 4) {
-                    if !mark.name.isEmpty {
-                        Text(verbatim: mark.name).font(.capture(.subheadline, weight: .semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Text(verbatim: "\(startText) – \(endText)")
-                        .font(.capture(.footnote, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(SwevoStyle.secondary).environment(\.layoutDirection, .leftToRight)
+                    Text(verbatim: mark.name.nilIfBlank ?? L10n.text("Unnamed range", language: AppLanguage.from(locale)))
+                        .font(.capture(.subheadline, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
+                    timeRange(start: mark.start, end: mark.end)
+                        .font(.capture(.footnote, weight: .semibold))
+                        .foregroundStyle(isLooping ? SwevoStyle.accent : SwevoStyle.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 IconButton(symbol: .close, label: "Remove range") {
                     error = nil
@@ -656,60 +1216,55 @@ private struct VideoRangePanel: View {
                 }
             }
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 4) { rangeActions(mark, range: range, url: url, isLooping: isLooping) }
+                HStack(spacing: 4) { rangeActions(mark, range: range, isLooping: isLooping) }
                     .fixedSize(horizontal: true, vertical: false)
-                VStack(alignment: .leading, spacing: 4) { rangeActions(mark, range: range, url: url, isLooping: isLooping) }
+                VStack(alignment: .leading, spacing: 4) { rangeActions(mark, range: range, isLooping: isLooping) }
             }
-            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
-        }.padding(.vertical, 5)
+        }
+        .padding(10)
+        .background(SwevoStyle.accent.opacity(isLooping ? 0.1 : 0), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(isLooping ? SwevoStyle.accent : SwevoStyle.line)
+                .frame(height: 1).allowsHitTesting(false).accessibilityHidden(true)
+        }
     }
 
-    @ViewBuilder private func rangeActions(_ mark: VideoRangeMark, range: ClosedRange<Double>, url: URL, isLooping: Bool) -> some View {
-        rangeCommand(isLooping ? "Stop loop" : "Loop range", symbol: isLooping ? .pause : .play, emphasized: true) {
-            editingName = false
+    @ViewBuilder private func rangeActions(_ mark: VideoRangeMark, range: ClosedRange<Double>, isLooping: Bool) -> some View {
+        EditorCommand(title: isLooping ? "Stop loop" : "Loop range", symbol: isLooping ? .pause : .play, emphasized: true) {
+            editingName.wrappedValue = false
             if isLooping {
                 playback.pause()
                 playback.stopRepeating()
             } else {
-                playRange(range)
+                playRange(mark)
             }
         }
-        rangeCommand("Compare frames", symbol: .feed) {
-            editingName = false
-            playback.pause()
-            playback.stopRepeating()
-            frameRequest = RangeFrameRequest(source: url, mark: mark)
+        EditorCommand(title: "Compare 3 frames", symbol: .feed) {
+            compareRange(mark)
         }.accessibilityIdentifier("video.range.compareFrames")
-        rangeCommand("Use for trim", symbol: .edit) {
-            editingName = false
+        EditorCommand(title: "Use for trim", symbol: .edit) {
+            editingName.wrappedValue = false
             trimToRange(range)
         }
     }
 
-    private func rangeCommand(_ title: String, symbol: SwevoGlyph, emphasized: Bool = false,
-                              action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Glyph(symbol: symbol, size: 15, tint: emphasized ? SwevoStyle.ink : SwevoStyle.accent)
-                LocalizedText(title).font(.capture(.footnote, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-            }.padding(.horizontal, 12).padding(.vertical, 4).frame(minHeight: 44)
-                .foregroundStyle(emphasized ? SwevoStyle.ink : SwevoStyle.paper)
-                .background(emphasized ? SwevoStyle.accent : Color.clear, in: Capsule())
-                .contentShape(Rectangle())
-        }.buttonStyle(PressStyle())
+    private func timeRange(start: Double, end: Double) -> some View {
+        Text(verbatim: "\(durationLabel(start, fractional: true)) – \(durationLabel(end, fractional: true))")
+            .monospacedDigit().environment(\.layoutDirection, .leftToRight)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func saveRange() {
-        guard start.isFinite, end.isFinite, start >= 0, start < end, end <= duration else {
+        guard start.isFinite, end.isFinite, start >= 0, end - start >= 1.0 / 600, end <= duration else {
             error = "Choose a start and end for the range."
             return
         }
-        editingName = false
+        editingName.wrappedValue = false
         do {
-            try library.addRange(start...end, name: name, to: movieID)
+            let mark = try library.addRange(start...end, name: name, to: movieID)
             name = ""
             error = nil
+            if saveAndLoop { playRange(mark) }
         } catch {
             self.error = error.localizedDescription
         }
@@ -726,7 +1281,7 @@ struct RangeFrameRequest: Identifiable {
     }
 
     @MainActor
-    func readFrames() async throws -> [RangeStill] {
+    func readFrames(maximumSize: CGFloat = 1440) async throws -> [RangeStill] {
         guard source.isFileURL, FileManager.default.isReadableFile(atPath: source.path) else {
             throw SwevoError.service("This file can’t be read. Choose the video again from Files.")
         }
@@ -734,7 +1289,7 @@ struct RangeFrameRequest: Identifiable {
         let asset = AVURLAsset(url: source)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 1440, height: 1440)
+        generator.maximumSize = CGSize(width: maximumSize, height: maximumSize)
         let tolerance = CMTime(value: 1, timescale: 8)
         generator.requestedTimeToleranceBefore = tolerance
         let length = range.upperBound - range.lowerBound
@@ -796,6 +1351,7 @@ private struct SharedRangeStills: Identifiable, Sendable {
 @MainActor
 private struct RangeFrameComparison: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
     let request: RangeFrameRequest
     @State private var frames: [RangeStill] = []
@@ -806,17 +1362,16 @@ private struct RangeFrameComparison: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SheetHeading(title: "Compare frames") { dismiss() }.disabled(exporting)
+            SheetHeading(title: "Compare 3 frames") { dismiss() }.disabled(exporting)
             ScenePage { container in
                 VStack(alignment: .leading, spacing: 16) {
-                    if !request.mark.name.isEmpty {
-                        Text(verbatim: request.mark.name).font(.capture(.title3, display: true))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text(verbatim: request.title(in: AppLanguage.from(locale)))
+                        .font(.capture(.title3, display: true))
+                        .fixedSize(horizontal: false, vertical: true)
                     if let selected = frames.first(where: { $0.position == selectedPosition }) {
-                        preview(selected, in: container)
                         frameStrip(in: container)
                         RangeShareActions(context: .comparison(request, frames), busy: $exporting)
+                        preview(selected, in: container)
                     } else if let loadError {
                         ErrorNote(message: loadError)
                         ActionButton(title: "Retry", primary: false) { loadAttempt = UUID() }
@@ -842,7 +1397,7 @@ private struct RangeFrameComparison: View {
 
     private func frameStrip(in container: GeometryProxy) -> some View {
         let bounds = CGRect(origin: .zero, size: container.size)
-        let wide = !typeSize.isAccessibilitySize && SwevoStyle.pageContentWidth(in: container) >= 300
+        let wide = typeSize <= .xLarge && SwevoStyle.pageContentWidth(in: container) >= 300
             && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
         let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 8))
                           : AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
@@ -898,7 +1453,7 @@ private struct RangeFrameComparison: View {
 struct RangeShareActions: View {
     enum Context {
         case comparison(RangeFrameRequest, [RangeStill])
-        case practice(source: URL, marks: [VideoRangeMark])
+        case practice(source: URL, marks: [VideoRangeMark], stacked: Bool, loop: (VideoRangeMark) -> Void)
     }
 
     private enum Format { case comparison, stills }
@@ -912,62 +1467,106 @@ struct RangeShareActions: View {
     @State private var selectedRangeID: UUID?
     @State private var showingPlus = false
     @State private var sharedStills: SharedRangeStills?
+    @State private var practiceComparison: RangeFrameRequest?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             switch context {
             case .comparison(let request, let frames):
-                ActionButton(title: "Share comparison image") {
-                    export(request, frames: frames, format: .comparison)
-                }.disabled(busy).accessibilityIdentifier("video.range.shareComparison")
-                ActionButton(title: "Export JPEG stills", primary: false) {
-                    export(request, frames: frames, format: .stills)
-                }.disabled(busy).accessibilityIdentifier("video.range.exportStills")
+                comparisonActions(request, frames: frames).disabled(busy)
+                exportNote
                 if busy { AccountLoadingIndicator(title: "Preparing export…") }
                 if let exportError { ErrorNote(message: exportError) }
-            case .practice(let source, let marks):
-                SectionLabel(title: "Share comparison image").accessibilityAddTraits(.isHeader)
-                ForEach(marks) { mark in
-                    practiceRow(RangeFrameRequest(source: source, mark: mark))
+            case .practice(let source, let marks, let stacked, let loop):
+                SectionLabel(title: "Saved ranges").accessibilityAddTraits(.isHeader)
+                exportNote
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(marks) { mark in
+                        practiceRow(RangeFrameRequest(source: source, mark: mark),
+                                    showPreview: marks.first?.id == mark.id, stacked: stacked) {
+                            loop(mark)
+                        }
+                    }
                 }
             }
-            if !commerce.hasVerifiedPlus {
-                LocalizedText("Export is included with Plus.").font(.capture(.footnote))
-                    .foregroundStyle(SwevoStyle.secondary).fixedSize(horizontal: false, vertical: true)
-            }
         }
-        .sheet(isPresented: $showingPlus) { MembershipView(exportRequired: true) }
+        .fullScreenCover(isPresented: $showingPlus) { MembershipView(exportRequired: true) }
+        .sheet(item: $practiceComparison) { request in RangeFrameComparison(request: request) }
         .sheet(item: $sharedStills) { ShareSheet(items: $0.files) }
         .onDisappear { exportTask?.cancel() }
     }
 
-    private func practiceRow(_ request: RangeFrameRequest) -> some View {
+    @ViewBuilder private var exportNote: some View {
+        if !commerce.hasVerifiedPlus {
+            LocalizedText("Export is included with Plus.").font(.capture(.footnote))
+                .foregroundStyle(SwevoStyle.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func comparisonActions(_ request: RangeFrameRequest, frames: [RangeStill]) -> some View {
+        let collage = EditorCommand(title: "Share three-frame collage", symbol: .download,
+                                    emphasized: true, expanded: true) {
+            export(request, frames: frames, format: .comparison)
+        }.accessibilityIdentifier("video.range.shareComparison")
+        let stills = EditorCommand(title: "Export JPEG stills", symbol: .feed) {
+            export(request, frames: frames, format: .stills)
+        }.accessibilityIdentifier("video.range.exportStills")
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                collage.fixedSize(horizontal: true, vertical: false)
+                stills.fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                collage
+                stills
+            }
+        }
+    }
+
+    private func practiceRow(_ request: RangeFrameRequest, showPreview: Bool, stacked: Bool,
+                             loop: @escaping () -> Void) -> some View {
         let start = durationLabel(request.mark.start, fractional: true)
         let end = durationLabel(request.mark.end, fractional: true)
-        let selected = selectedRangeID == request.id
-        return VStack(alignment: .leading, spacing: 4) {
-            Button { export(request, format: .comparison) } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(verbatim: request.title(in: AppLanguage.from(locale)))
-                            .font(.capture(.subheadline, weight: .semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(verbatim: "\(start) – \(end)")
-                            .font(.capture(.caption)).monospacedDigit().foregroundStyle(SwevoStyle.secondary)
-                            .environment(\.layoutDirection, .leftToRight)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                    if busy && selected {
-                        ProgressView().tint(SwevoStyle.accent).frame(width: 44).accessibilityLabel("Preparing export…")
-                    } else {
-                        Glyph(symbol: .download, size: 19, tint: SwevoStyle.accent).frame(width: 44)
+        let exportingThisRange = selectedRangeID == request.id
+        let replay = EditorCommand(title: "Loop range", symbol: .play, emphasized: true, action: loop)
+            .accessibilityIdentifier("practice.review.loop.\(request.id.uuidString)")
+        let compare = EditorCommand(title: "Compare 3 frames", symbol: .feed) { practiceComparison = request }
+            .accessibilityIdentifier("practice.review.compare.\(request.id.uuidString)")
+        return VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: request.title(in: AppLanguage.from(locale)))
+                    .font(.capture(.headline)).fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: "\(start) – \(end)")
+                    .font(.capture(.footnote)).monospacedDigit().foregroundStyle(SwevoStyle.secondary)
+                    .environment(\.layoutDirection, .leftToRight)
+                    .fixedSize(horizontal: false, vertical: true)
+            }.accessibilityElement(children: .combine)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 4) {
+                        replay.fixedSize(horizontal: true, vertical: false)
+                        compare.fixedSize(horizontal: true, vertical: false)
                     }
-                }.padding(.vertical, 5).frame(minHeight: 44).contentShape(Rectangle())
-            }.buttonStyle(PressStyle()).disabled(busy)
-                .accessibilityElement(children: .combine).accessibilityHint("Share comparison image")
+                    VStack(alignment: .leading, spacing: 0) {
+                        replay
+                        compare
+                    }
+                }
+                EditorCommand(title: "Share three-frame collage", symbol: .download) {
+                    export(request, format: .comparison)
+                }
                 .accessibilityIdentifier("practice.review.shareComparison.\(request.id.uuidString)")
-            if selected, let exportError { ErrorNote(message: exportError) }
-            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+            }.disabled(busy)
+
+            if exportingThisRange {
+                if busy { AccountLoadingIndicator(title: "Preparing export…") }
+                if let exportError { ErrorNote(message: exportError) }
+            }
+            if showPreview { RangePreview(request: request, stacked: stacked).id(request.id) }
         }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .swevoGlass(cornerRadius: 15)
     }
 
     private func export(_ request: RangeFrameRequest, frames: [RangeStill]? = nil, format: Format) {
@@ -1019,7 +1618,7 @@ struct RangeShareActions: View {
             renderer.scale = 2
             renderer.isOpaque = true
             guard let image = renderer.cgImage else { throw SwevoError.service("Couldn’t create the comparison image. Try again.") }
-            return [("Swevo-range-\(request.id.uuidString.prefix(8)).jpg", image)]
+            return [("Kstep-range-\(request.id.uuidString.prefix(8)).jpg", image)]
         }
     }
 
@@ -1100,43 +1699,151 @@ private struct VideoPlaybackControls: View {
     let canResume: Bool
     @Binding var scrubbing: Bool
     let retry: () -> Void
+    let sourceFrames: [UIImage?]?
+    let sourceDuration: Double
+    let trim: ClosedRange<Double>
+    let compareLoop: (() -> Void)?
+    let rangesTitle: String
+    let openRanges: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 12) {
-                let playing = playback.intendsPlayback
-                IconButton(symbol: playing ? .pause : .play, label: playing ? "Pause preview" : "Play preview") {
-                    playback.toggle()
+        VStack(alignment: .leading, spacing: 9) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 4) {
+                    playbackStatus.fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    reviewCommands.fixedSize(horizontal: true, vertical: false)
                 }
-                .background { CaptureSurface(tone: .plum) }
-                .disabled(!enabled || playback.error != nil)
-                Text(verbatim: "\(durationLabel(timeline.elapsed)) / \(durationLabel(timeline.duration))")
-                    .font(.capture(.footnote)).monospacedDigit()
-                    .foregroundStyle(SwevoStyle.secondary)
-                    .environment(\.layoutDirection, .leftToRight)
-                if playback.isLoading && playing {
-                    ProgressView().tint(SwevoStyle.accent).accessibilityLabel("Loading…")
+                VStack(alignment: .leading, spacing: 0) {
+                    playbackStatus
+                    reviewCommands
                 }
             }
             PlayerProgressControl(playback: playback, timeline: timeline, enabled: enabled,
-                                  canResume: canResume, scrubbing: $scrubbing)
-            if playback.repeatedRange != nil {
-                Button("Stop loop") {
-                    playback.pause()
-                    playback.stopRepeating()
-                }.buttonStyle(CompactActionStyle()).disabled(!enabled)
-            }
+                                  canResume: canResume, scrubbing: $scrubbing,
+                                  tint: SwevoStyle.accent, showsPlayhead: sourceFrames != nil)
+                .background {
+                    if let sourceFrames {
+                        EditorFilmstrip(frames: sourceFrames, duration: sourceDuration,
+                                        trim: trim, looping: playback.repeatedRange)
+                    }
+                }
             if let error = playback.error {
                 ErrorNote(message: "Preview could not play. \(error)")
-                ActionButton(title: "Retry", primary: false, action: retry).disabled(!enabled)
+                EditorCommand(title: "Retry", action: retry).disabled(!enabled)
             }
+        }
+        .padding(9)
+        .swevoGlass(cornerRadius: 16)
+    }
+
+    private var playbackStatus: some View {
+        let playing = playback.intendsPlayback
+        let mode = playback.repeatedRange != nil ? "Looping" : sourceFrames == nil ? "Edited preview" : "Original"
+        let duration = timeline.duration > 0 || sourceFrames == nil ? timeline.duration : sourceDuration
+        let elapsed = durationLabel(timeline.elapsed, fractional: true)
+        let total = Text(verbatim: durationLabel(duration, fractional: true))
+            .foregroundStyle(SwevoStyle.secondary)
+        return HStack(spacing: 9) {
+            IconButton(symbol: playing ? .pause : .play, label: playing ? "Pause preview" : "Play preview") {
+                playback.toggle()
+            }
+            .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 10))
+            .disabled(!enabled || playback.error != nil)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(elapsed) / \(total)")
+                    .font(.capture(.subheadline, weight: .semibold)).monospacedDigit()
+                    .environment(\.layoutDirection, .leftToRight)
+                LocalizedText(mode).font(.capture(.caption))
+                    .foregroundStyle(playback.repeatedRange != nil ? SwevoStyle.accent : SwevoStyle.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            if playback.isLoading && playing {
+                ProgressView().tint(SwevoStyle.accent).accessibilityLabel("Loading…")
+            }
+        }
+    }
+
+    @ViewBuilder private var reviewCommands: some View {
+        if playback.repeatedRange != nil {
+            EditorCommand(title: "Stop loop", symbol: .pause) {
+                playback.pause()
+                playback.stopRepeating()
+            }.disabled(!enabled)
+        }
+        if playback.repeatedRange != nil, let compareLoop {
+            EditorCommand(title: "Compare 3 frames", symbol: .feed, action: compareLoop)
+                .disabled(!enabled)
+                .accessibilityIdentifier("editor.compareLoop")
+        } else if let openRanges {
+            EditorCommand(title: rangesTitle, symbol: .bookmark, action: openRanges)
+                .accessibilityIdentifier("editor.openRanges")
         }
     }
 }
 
+private struct EditorFilmstrip: View {
+    let frames: [UIImage?]
+    let duration: Double
+    let trim: ClosedRange<Double>
+    let looping: ClosedRange<Double>?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
+            let cellWidth = width / CGFloat(max(1, frames.count))
+            let start = offset(for: trim.lowerBound, width: width)
+            let end = offset(for: trim.upperBound, width: width)
+            ZStack(alignment: .leading) {
+                SwevoStyle.raised
+                HStack(spacing: 0) {
+                    ForEach(frames.indices, id: \.self) { index in
+                        Group {
+                            if let frame = frames[index] {
+                                Image(uiImage: frame).resizable().scaledToFill()
+                            } else {
+                                SwevoStyle.surface
+                            }
+                        }
+                        .frame(width: cellWidth, height: height)
+                        .clipped()
+                        .overlay(alignment: .trailing) {
+                            Rectangle().fill(SwevoStyle.ink.opacity(0.65)).frame(width: 1)
+                        }
+                    }
+                }
+                Color.black.opacity(0.58).frame(width: start)
+                Color.black.opacity(0.58).frame(width: width - end).offset(x: end)
+                RoundedRectangle(cornerRadius: 6).strokeBorder(SwevoStyle.accent, lineWidth: 1)
+                    .frame(width: max(0, end - start)).offset(x: start)
+                if let looping {
+                    let loopStart = offset(for: looping.lowerBound, width: width)
+                    let loopEnd = offset(for: looping.upperBound, width: width)
+                    Capsule().fill(SwevoStyle.accent)
+                        .frame(width: max(0, loopEnd - loopStart), height: 4)
+                        .padding(.bottom, 3)
+                        .frame(height: height, alignment: .bottom)
+                        .offset(x: loopStart)
+                }
+            }
+        }
+        .clipShape(.rect(cornerRadius: 6))
+        .environment(\.layoutDirection, .leftToRight)
+        .allowsHitTesting(false).accessibilityHidden(true)
+    }
+
+    private func offset(for time: Double, width: CGFloat) -> CGFloat {
+        width * CGFloat(min(1, max(0, time / duration)))
+    }
+}
+
 struct VideoImportActions: View {
-    enum Presentation {
-        case standard, prominent, library
+    enum Presentation: Equatable {
+        case standard, prominent
+        case library(stacked: Bool, photosFirst: Bool = false)
+        case sourcePair(stacked: Bool)
+        case home(stacked: Bool)
     }
 
     @EnvironmentObject private var library: LibraryStore
@@ -1157,8 +1864,12 @@ struct VideoImportActions: View {
                     ProgressView().tint(SwevoStyle.accent).accessibilityHidden(true)
                     LocalizedText("Importing…").font(.capture(.subheadline, weight: .semibold))
                 }.frame(minHeight: 48)
-            } else if presentation == .library {
-                librarySources
+            } else if case let .home(stacked) = presentation {
+                homeSources(stacked: stacked)
+            } else if case let .sourcePair(stacked) = presentation {
+                pairedSources(stacked: stacked || typeSize > .xLarge)
+            } else if case let .library(stacked, photosFirst) = presentation {
+                librarySources(stacked: stacked || typeSize > .xLarge, photosFirst: photosFirst)
             } else {
                 let paired = prominent && !typeSize.isAccessibilitySize
                 let layout = paired ? AnyLayout(HStackLayout(spacing: 8))
@@ -1194,28 +1905,107 @@ struct VideoImportActions: View {
         }
     }
 
-    private var librarySources: some View {
-        let stacked = typeSize > .xLarge
-        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+    private func homeSources(stacked: Bool) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                             : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
         return layout {
             Button { showingFiles = true } label: {
-                librarySourceLabel("Open video", glyph: .folder, primary: true)
-            }.buttonStyle(PressStyle())
-                .accessibilityLabel("Open video file")
-                .accessibilityIdentifier("video.import.files")
+                homeSourceLabel("Open video file", glyph: .folder)
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Open video file")
+            .accessibilityIdentifier("video.import.files")
 
             PhotosPicker(selection: $photo, matching: .videos, photoLibrary: .shared()) {
-                librarySourceLabel("Photos", glyph: .feed, primary: false)
-            }.buttonStyle(PressStyle())
-                .fixedSize(horizontal: !stacked, vertical: false)
-                .overlay(alignment: stacked ? .top : .leading) {
-                    Rectangle().fill(SwevoStyle.line)
-                        .frame(width: stacked ? nil : 1, height: stacked ? 1 : nil)
-                        .padding(stacked ? .horizontal : .vertical, 10)
-                        .allowsHitTesting(false).accessibilityHidden(true)
-                }
-                .accessibilityLabel("Choose from Photos")
-                .accessibilityIdentifier("video.import.photos")
+                homeSourceLabel("Photos", glyph: .feed)
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Choose from Photos")
+            .accessibilityIdentifier("video.import.photos")
+        }
+    }
+
+    private func homeSourceLabel(_ title: String, glyph: SwevoGlyph) -> some View {
+        HStack(spacing: 8) {
+            Glyph(symbol: glyph, size: 16, tint: SwevoStyle.secondary)
+            LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .foregroundStyle(SwevoStyle.paper)
+        .contentShape(Rectangle())
+    }
+
+    private func pairedSources(stacked: Bool) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
+            Button { showingFiles = true } label: {
+                pairedSourceLabel("Files", symbol: .folder, primary: true)
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Open video file")
+            .accessibilityIdentifier("video.import.files")
+
+            PhotosPicker(selection: $photo, matching: .videos, photoLibrary: .shared()) {
+                pairedSourceLabel("Photos", symbol: .feed, primary: false)
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Choose from Photos")
+            .accessibilityIdentifier("video.import.photos")
+        }
+    }
+
+    private func pairedSourceLabel(_ title: String, symbol: SwevoGlyph, primary: Bool) -> some View {
+        HStack(spacing: 9) {
+            Glyph(symbol: symbol, size: 18, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
+            LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 50)
+        .foregroundStyle(primary ? SwevoStyle.ink : SwevoStyle.paper)
+        .background {
+            if primary {
+                CaptureSurface(tone: .accent)
+            } else {
+                Color.clear.swevoGlass(cornerRadius: 12)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func librarySources(stacked: Bool, photosFirst: Bool) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        let divider = Rectangle().fill(SwevoStyle.line)
+            .frame(width: stacked ? nil : 1, height: stacked ? 1 : nil)
+            .padding(stacked ? .horizontal : .vertical, 10)
+            .allowsHitTesting(false).accessibilityHidden(true)
+        let files = Button { showingFiles = true } label: {
+            librarySourceLabel(photosFirst ? "Files" : "Open video", glyph: .folder, primary: !photosFirst)
+        }
+        .buttonStyle(PressStyle())
+        .fixedSize(horizontal: !stacked && photosFirst, vertical: false)
+        .overlay(alignment: stacked ? .top : .leading) { if photosFirst { divider } }
+        .accessibilityLabel("Open video file")
+        .accessibilityIdentifier("video.import.files")
+
+        let photos = PhotosPicker(selection: $photo, matching: .videos, photoLibrary: .shared()) {
+            librarySourceLabel(photosFirst ? "Choose from Photos" : "Photos", glyph: .feed, primary: photosFirst)
+        }
+        .buttonStyle(PressStyle())
+        .fixedSize(horizontal: !stacked && !photosFirst, vertical: false)
+        .overlay(alignment: stacked ? .top : .leading) { if !photosFirst { divider } }
+        .accessibilityLabel("Choose from Photos")
+        .accessibilityIdentifier("video.import.photos")
+
+        return layout {
+            if photosFirst {
+                photos
+                files
+            } else {
+                files
+                photos
+            }
         }
         .padding(4)
         .swevoGlass(cornerRadius: 20)
@@ -1303,30 +2093,32 @@ struct VideoImportActions: View {
 }
 
 struct VideoFileButton: View {
+    enum Presentation: Equatable {
+        case row, featured, thumbnail
+        case picker(tiled: Bool)
+    }
+
     @Environment(\.dynamicTypeSize) private var typeSize
     let url: URL
     let filename: String
     let date: Date
-    var featured = false
+    var presentation: Presentation = .row
     var fallbackCover: URL? = nil
     var detail: String? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            if featured && !typeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 10) {
-                    VideoFileThumbnail(url: url, maximumSize: 1080, fallbackCover: fallbackCover)
-                        .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                        .overlay(alignment: .bottomTrailing) {
-                            Glyph(symbol: .play, size: 21, tint: SwevoStyle.paper)
-                                .frame(width: 48, height: 48)
-                                .swevoGlass(cornerRadius: 24)
-                                .padding(10).allowsHitTesting(false)
-                        }
-                    fileLabel.padding(.vertical, 3)
-                }
-                .contentShape(Rectangle())
+            if case let .picker(tiled) = presentation {
+                pickerLabel(tiled: tiled)
+            } else if presentation == .thumbnail {
+                coverLabel(featured: false)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .swevoGlass(cornerRadius: 16)
+                    .contentShape(.interaction, RoundedRectangle(cornerRadius: 16))
+            } else if presentation == .featured && !typeSize.isAccessibilitySize {
+                coverLabel(featured: true)
+                    .contentShape(Rectangle())
             } else {
                 HStack(spacing: 12) {
                     VideoFileThumbnail(url: url, fallbackCover: fallbackCover)
@@ -1342,21 +2134,62 @@ struct VideoFileButton: View {
         .buttonStyle(PressStyle())
     }
 
+    private func pickerLabel(tiled: Bool) -> some View {
+        let layout = tiled ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                           : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
+            VideoFileThumbnail(url: url, maximumSize: tiled ? 720 : 360, fallbackCover: fallbackCover)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .frame(width: tiled ? nil : 104)
+                .clipShape(.rect(cornerRadius: 8))
+            fileLabel
+        }
+        .padding(.vertical, tiled ? 0 : 6)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func coverLabel(featured: Bool) -> some View {
+        VStack(alignment: .leading, spacing: featured ? 10 : 0) {
+            VideoFileThumbnail(url: url, maximumSize: featured ? 1080 : 640, fallbackCover: fallbackCover)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                .overlay(alignment: .bottomTrailing) {
+                    let size: CGFloat = featured ? 48 : 34
+                    Glyph(symbol: .play, size: featured ? 21 : 15, tint: SwevoStyle.paper)
+                        .frame(width: size, height: size)
+                        .swevoGlass(cornerRadius: size / 2)
+                        .padding(featured ? 10 : 8)
+                        .allowsHitTesting(false)
+                }
+            fileLabel
+                .padding(.horizontal, featured ? 0 : 12)
+                .padding(.vertical, featured ? 3 : 10)
+        }
+    }
+
     private var fileLabel: some View {
-        HStack(spacing: 10) {
+        let name = Text(verbatim: filename).font(.capture(.subheadline, weight: .semibold))
+            .foregroundStyle(SwevoStyle.paper)
+        let opened = LocalizedDateText(date: date)
+            .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+        return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: filename).font(.capture(.subheadline, weight: .semibold))
-                    .foregroundStyle(SwevoStyle.paper)
-                    .fixedSize(horizontal: false, vertical: true)
-                LocalizedDateText(date: date)
-                    .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                if presentation == .thumbnail || presentation == .picker(tiled: true) {
+                    name.lineLimit(2, reservesSpace: true).truncationMode(.middle)
+                    opened.lineLimit(typeSize.isAccessibilitySize ? 2 : 1, reservesSpace: true)
+                } else {
+                    name.fixedSize(horizontal: false, vertical: true)
+                    opened
+                }
                 if let detail {
                     LocalizedText(detail).font(.capture(.caption)).foregroundStyle(SwevoStyle.accent)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Glyph(symbol: .back, size: 13, tint: SwevoStyle.secondary).rotationEffect(.degrees(180))
+            if presentation != .thumbnail {
+                Glyph(symbol: .back, size: 13, tint: SwevoStyle.secondary).rotationEffect(.degrees(180))
+            }
         }
     }
 }
@@ -1367,15 +2200,16 @@ struct VideoFileThumbnail: View {
     var isAudio = false
     var fallbackCover: URL? = nil
     var timestamp: Double = 0
+    var contentMode: ContentMode = .fill
     @State private var frame: CGImage?
     @State private var needsCover = false
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                SwevoStyle.raised
+                contentMode == .fit ? SwevoStyle.ink : SwevoStyle.raised
                 if let frame {
-                    Image(decorative: frame, scale: 1).resizable().scaledToFill()
+                    Image(decorative: frame, scale: 1).resizable().aspectRatio(contentMode: contentMode)
                         .frame(width: geometry.size.width, height: geometry.size.height)
                 } else if needsCover, let fallbackCover {
                     MediaCover(url: fallbackCover)

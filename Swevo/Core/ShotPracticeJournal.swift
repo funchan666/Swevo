@@ -117,12 +117,13 @@ final class ShotPracticeJournal: ObservableObject {
         return commit(next) ? session : nil
     }
 
-    func attachReviewVideo(_ movieID: UUID, to sessionID: UUID) {
-        guard let index = archive.completedSessions.firstIndex(where: { $0.id == sessionID }),
-              archive.completedSessions[index].reviewMovieID != movieID else { return }
+    @discardableResult
+    func attachReviewVideo(_ movieID: UUID, to sessionID: UUID) -> Bool {
+        guard let index = archive.completedSessions.firstIndex(where: { $0.id == sessionID }) else { return false }
+        guard archive.completedSessions[index].reviewMovieID != movieID else { return true }
         var next = archive
         next.completedSessions[index].reviewMovieID = movieID
-        commit(next)
+        return commit(next)
     }
 
     @discardableResult
@@ -141,7 +142,7 @@ final class ShotPracticeJournal: ObservableObject {
              String(take.lockedFocus), take.result.rawValue, Self.csvField(take.note)].joined(separator: ",")
         }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ShotExports", isDirectory: true)
-        let url = folder.appendingPathComponent("swevo-session-\(session.id.uuidString).csv")
+        let url = folder.appendingPathComponent("Kstep-session-\(session.id.uuidString).csv")
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data(([header] + rows).joined(separator: "\r\n").appending("\r\n").utf8)

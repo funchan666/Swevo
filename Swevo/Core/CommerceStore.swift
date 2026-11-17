@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import OSLog
 import StoreKit
 
 private struct PurchaseFailure: Codable {
@@ -55,11 +56,12 @@ final class CommerceStore: NSObject, ObservableObject {
     private var refreshID = UUID()
     private var refreshTask: Task<Void, Never>?
     private var refreshingOwner: String?
+    private let plansLogger = Logger(subsystem: "app.swevo", category: "StoreKitPlans")
     var premium: Bool {
         guard let ownerID, ownerID == api.session?.userId.value else { return false }
         return expiration.map { $0 > Date() } ?? false
     }
-    private var verifiedCurrentAccount: Bool {
+    var verifiedCurrentAccount: Bool {
         rightsVerified && ownerID != nil && ownerID == api.session?.userId.value
     }
     var hasVerifiedPlus: Bool { verifiedCurrentAccount && premium }
@@ -156,7 +158,11 @@ final class CommerceStore: NSObject, ObservableObject {
         plansError = nil
         products = []
         defer { loadingPlans = false }
-        for entry in policy?.products ?? [] {
+        guard let entries = policy?.products, !entries.isEmpty else {
+            plansError = "Subscription setup is incomplete. Please contact support."
+            return
+        }
+        for entry in entries {
             do {
                 let product = try await requestProduct(entry.id)
                 try Task.checkCancellation()
@@ -393,7 +399,7 @@ final class CommerceStore: NSObject, ObservableObject {
         guard let index = records.firstIndex(where: {
             $0.id == binding || $0.transactionIDs.contains(transactionID) || $0.originalTransactionID == original
         }), records[index].productID == transaction.payment.productIdentifier else {
-            error = "Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access."
+            error = "Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access."
             return false
         }
         let record = records[index]
@@ -427,7 +433,7 @@ final class CommerceStore: NSObject, ObservableObject {
         let isPurchase = transaction.transactionState == .purchased
         SKPaymentQueue.default().finishTransaction(transaction)
         guard api.session?.userId.value == record.owner.userId.value else {
-            error = "This purchase is linked to another Swevo account. Contact support for help restoring access."
+            error = "This purchase is linked to another Kstep account. Contact support for help restoring access."
             return false
         }
         if refreshAccess {
@@ -460,14 +466,23 @@ extension CommerceStore: SKProductsRequestDelegate, SKRequestDelegate, SKPayment
     nonisolated func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
         Task { @MainActor in
             guard request === productsRequest else { return }
-            guard let id = requestedProductID,
-                  let expected = policy?.products.first(where: { $0.id == id })?.period,
-                  let product = response.products.first(where: { $0.productIdentifier == id }),
-                  let period = product.subscriptionPeriod, period.numberOfUnits == 1,
-                  period.unit == (expected == .month ? .month : .year) else {
+            guard let id = requestedProductID else {
+                finishProductRequest(request, result: .failure(SwevoError.invalidResponse))
+                return
+            }
+            guard let product = response.products.first(where: { $0.productIdentifier == id }) else {
+                let reason = response.invalidProductIdentifiers.contains(id) ? "invalid identifier" : "missing product"
+                plansLogger.error("StoreKit did not return \(id, privacy: .public): \(reason, privacy: .public)")
                 finishProductRequest(request, result: .failure(SwevoError.service("This plan isn’t available from Apple yet. Please try again later.")))
                 return
             }
+            guard let period = product.subscriptionPeriod, period.numberOfUnits > 0,
+                  product.subscriptionGroupIdentifier?.nilIfBlank != nil else {
+                plansLogger.error("StoreKit returned \(id, privacy: .public) without a valid auto-renewing period")
+                finishProductRequest(request, result: .failure(SwevoError.service("Subscription setup is incomplete. Please contact support.")))
+                return
+            }
+            plansLogger.info("StoreKit returned \(id, privacy: .public) with period \(period.numberOfUnits, privacy: .public) x \(period.unit.rawValue, privacy: .public)")
             finishProductRequest(request, result: .success(product))
         }
     }
@@ -478,6 +493,8 @@ extension CommerceStore: SKProductsRequestDelegate, SKRequestDelegate, SKPayment
                 receiptContinuation?.resume(throwing: error)
                 receiptContinuation = nil
             } else if request === productsRequest {
+                let failure = error as NSError
+                plansLogger.error("StoreKit product request failed: \(failure.domain, privacy: .public) \(failure.code, privacy: .public)")
                 finishProductRequest(request, result: .failure(error))
             }
         }

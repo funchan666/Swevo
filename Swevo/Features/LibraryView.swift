@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 
 struct LibraryView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var offline: OfflineStore
     @EnvironmentObject private var commerce: CommerceStore
@@ -9,6 +10,7 @@ struct LibraryView: View {
     var edit: (PracticeRecording) -> Void
     var browseVideos: () -> Void
     var openEditor: () -> Void
+    let openPlus: () -> Void
     @Binding var filter: String
     @Binding var importing: Bool
     @State private var player: PlayerRoute?
@@ -17,6 +19,8 @@ struct LibraryView: View {
     @State private var removingDownload: OfflineVideo?
     @State private var sharingMovieID: UUID?
     @State private var editingDownloadID: String?
+    @State private var searchQuery = ""
+    @FocusState private var searchFocused: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var category: Category { Category(rawValue: filter) ?? .imports }
@@ -50,7 +54,7 @@ struct LibraryView: View {
             switch self {
             case .saved: "EmptyFavorites"
             case .offline: "EmptyOffline"
-            case .imports: "SceneArchive"
+            case .imports: "EmptyImports"
             case .exports: "EmptyExports"
             }
         }
@@ -66,7 +70,7 @@ struct LibraryView: View {
             switch self {
             case .saved: "Save a video while watching to find it here."
             case .offline: "Download a video to watch it without a connection."
-            case .imports: "Swevo makes a copy for editing."
+            case .imports: "Your original stays untouched."
             case .exports: "Videos and audio you export from the editor appear here."
             }
         }
@@ -83,22 +87,26 @@ struct LibraryView: View {
 
     var body: some View {
         ScenePage { container in
-            let width = SwevoStyle.pageContentWidth(in: container)
-            let bounds = CGRect(origin: .zero, size: container.size)
-            let showsSidebar = width >= 560 && !typeSize.isAccessibilitySize
-                && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
-            let layout = showsSidebar
-                ? AnyLayout(HStackLayout(alignment: .top, spacing: 26))
-                : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-            layout {
-                archiveIndex(vertical: showsSidebar || typeSize.isAccessibilitySize)
-                    .frame(maxWidth: showsSidebar ? 176 : .infinity, alignment: .leading)
-                librarySection(artworkWidth: showsSidebar ? nil : container.size.width,
-                               artworkHeight: min(224, max(128, container.size.height * 0.34)))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            let width = min(640, SwevoStyle.pageContentWidth(in: container))
+            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            let headerBounds = CGRect(x: 0, y: 0, width: container.size.width, height: 72)
+            let stackedHeader = width < 332 || typeSize > .xLarge
+                || SwevoStyle.intersectsReservedRegion(headerBounds, in: container)
+            VStack(alignment: .leading, spacing: 16) {
+                libraryHeader(stacked: stackedHeader)
+                if query.isEmpty {
+                    libraryContents(in: container, width: width)
+                } else {
+                    searchResults(for: query, stackedRows: width < 285 || typeSize.isAccessibilitySize)
+                }
             }
-        }.sheet(item: $sharing) { ShareSheet(items: [$0.url]) }
-            .sheet(isPresented: $showingExportMembership) { MembershipView(exportRequired: true) }
+        }
+            .scrollDismissesKeyboard(.interactively)
+            .dismissKeyboardOnOutsideTap($searchFocused, scope: "library-search")
+            .onChange(of: filter) { _, _ in endSearch() }
+            .onChange(of: library.downloadsRequest) { _, _ in endSearch() }
+            .sheet(item: $sharing) { ShareSheet(items: [$0.url]) }
+            .fullScreenCover(isPresented: $showingExportMembership) { MembershipView(exportRequired: true) }
             .fullScreenCover(item: $player) { PlayerScreen(route: $0) }
             .sheet(item: $removingDownload) { video in
                 ScrollView {
@@ -119,7 +127,7 @@ struct LibraryView: View {
                     VStack(alignment: .leading, spacing: 22) {
                         SheetHeading(title: "Delete this local copy?") { removing = nil }
                         Text(verbatim: movie.displayFilename).font(.capture(.headline))
-                        LocalizedText("This deletes the selected copy from your Swevo library.")
+                        LocalizedText("This deletes the selected copy from your Kstep library.")
                             .foregroundStyle(SwevoStyle.secondary)
                         ActionButton(title: "Delete local copy") { library.delete(movie); removing = nil }
                         ActionButton(title: "Cancel", primary: false) { removing = nil }
@@ -128,116 +136,283 @@ struct LibraryView: View {
             }
     }
 
-    private func archiveIndex(vertical: Bool) -> some View {
-        Group {
-            if vertical {
-                VStack(spacing: 0) {
-                    ForEach(Category.allCases) { entry in archiveTab(entry, vertical: true) }
+    private func libraryHeader(stacked: Bool) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                             : AnyLayout(HStackLayout(spacing: 8))
+        let plus = PlusEntryButton(action: openPlus)
+            .fixedSize(horizontal: true, vertical: false)
+        return layout {
+            HStack(spacing: 8) {
+                IconButton(symbol: .back, label: "Back") {
+                    searchFocused = false
+                    dismiss()
                 }
+                .swevoGlass(cornerRadius: 18)
+                .disabled(importing)
+                .accessibilityIdentifier("library.back")
+                if stacked {
+                    Spacer(minLength: 0)
+                    plus
+                }
+            }
+            HStack(spacing: 8) {
+                librarySearch
+                if !stacked { plus }
+            }
+        }
+    }
+
+    private var librarySearch: some View {
+        HStack(spacing: 0) {
+            Button { searchFocused = true } label: {
+                Glyph(symbol: .search, size: 17, tint: SwevoStyle.accent)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityHidden(true)
+            TextField("Search files", text: $searchQuery,
+                      prompt: Text("Search files").foregroundStyle(SwevoStyle.secondary))
+                .font(.capture(.subheadline))
+                .foregroundStyle(SwevoStyle.paper)
+                .tint(SwevoStyle.accent)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($searchFocused)
+                .submitLabel(.search)
+                .onSubmit { searchFocused = false }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.trailing, searchQuery.isEmpty ? 12 : 0)
+                .accessibilityLabel("Search files")
+                .accessibilityIdentifier("library.search")
+            if !searchQuery.isEmpty {
+                IconButton(symbol: .close, label: "Clear search") { searchQuery = "" }
+            }
+        }
+        .swevoGlass(cornerRadius: 18)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18).strokeBorder(searchFocused ? SwevoStyle.accent : .clear)
+                .allowsHitTesting(false)
+        }
+        .keyboardInputRegion("library-search")
+        .layoutPriority(1)
+    }
+
+    private func endSearch() {
+        searchQuery = ""
+        searchFocused = false
+    }
+
+    private func libraryContents(in container: GeometryProxy, width: CGFloat) -> some View {
+        let bounds = CGRect(origin: .zero, size: container.size)
+        let showsSidebar = width >= 560 && typeSize <= .xLarge
+            && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+        let sidebarWidth: CGFloat = 156
+        let gap: CGFloat = 24
+        let sectionWidth = showsSidebar ? width - sidebarWidth - gap : width
+        let layout = showsSidebar
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: gap))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+        return layout {
+            archiveIndex(sidebar: showsSidebar)
+                .frame(maxWidth: showsSidebar ? sidebarWidth : .infinity, alignment: .leading)
+            librarySection(in: container, columnWidth: showsSidebar ? sectionWidth : nil,
+                           stackedRows: sectionWidth < 285 || typeSize.isAccessibilitySize)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func searchResults(for query: String, stackedRows: Bool) -> some View {
+        let movies = library.movies.filter { $0.displayFilename.localizedStandardContains(query) }
+        let downloads = offline.videos.filter { $0.displayFilename.localizedStandardContains(query) }
+        let favorites = library.favorites.filter { $0.title.localizedStandardContains(query) }
+
+        return LazyVStack(alignment: .leading, spacing: 0) {
+            if offline.busy || !downloads.isEmpty { downloadStatus }
+            if movies.isEmpty, downloads.isEmpty, favorites.isEmpty, !offline.isRestoring {
+                VStack(alignment: .leading, spacing: 6) {
+                    LocalizedText("No matches").font(.capture(.headline))
+                        .accessibilityAddTraits(.isHeader)
+                    LocalizedText("Try a different name.").font(.capture(.subheadline))
+                        .foregroundStyle(SwevoStyle.secondary)
+                    Button("Clear search", action: endSearch)
+                        .buttonStyle(LibraryActionStyle())
+                        .padding(.top, 4)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 16)
+            }
+            searchSection(.imports, items: movies.filter { !$0.isExport }) { movieRow($0, stacked: stackedRows) }
+            searchSection(.offline, items: downloads) { downloadRow($0, stacked: stackedRows) }
+            searchSection(.exports, items: movies.filter(\.isExport)) { movieRow($0, stacked: stackedRows) }
+            searchSection(.saved, items: favorites) { favoriteRow($0, stacked: stackedRows) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func searchSection<Item: Identifiable, Row: View>(
+        _ category: Category, items: [Item], @ViewBuilder row: @escaping (Item) -> Row
+    ) -> some View {
+        if !items.isEmpty {
+            Section {
+                ForEach(items, content: row)
+            } header: {
+                HStack(spacing: 8) {
+                    Glyph(symbol: category.glyph, size: 15, tint: SwevoStyle.secondary)
+                    LocalizedText(category.title).font(.capture(.headline))
+                }
+                .padding(.top, 14)
+                .padding(.bottom, 4)
+                .accessibilityAddTraits(.isHeader)
+            }
+        }
+    }
+
+    private func archiveIndex(sidebar: Bool) -> some View {
+        let rows = VStack(spacing: 2) {
+            ForEach(Category.allCases) { entry in archiveTab(entry, vertical: true) }
+        }
+        return Group {
+            if sidebar || typeSize.isAccessibilitySize {
+                rows
             } else {
-                ScrollViewReader { scroll in
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 4) {
-                            ForEach(Category.allCases) { entry in
-                                archiveTab(entry, vertical: false).id(entry.id)
-                            }
-                        }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 2) {
+                        ForEach(Category.allCases) { entry in archiveTab(entry, vertical: false) }
                     }
-                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-                    .onChange(of: category, initial: true) { _, entry in
-                        scroll.scrollTo(entry.id, anchor: .center)
-                    }
+                    rows
                 }
             }
         }
-        .background(alignment: vertical ? .leading : .bottom) {
-            Rectangle().fill(SwevoStyle.line)
-                .frame(width: vertical ? 1 : nil, height: vertical ? nil : 1)
-                .allowsHitTesting(false).accessibilityHidden(true)
-        }
+        .padding(4)
+        .swevoGlass(cornerRadius: 17)
     }
 
     private func archiveTab(_ entry: Category, vertical: Bool) -> some View {
         let selected = category == entry
-        let total = count(in: entry)
+        let glyph = Glyph(symbol: entry.glyph, size: 17, tint: selected ? SwevoStyle.accent : SwevoStyle.secondary)
+        let title = LocalizedText(entry.title)
+            .font(.capture(.footnote, weight: .semibold))
+            .fixedSize(horizontal: !vertical, vertical: true)
+        let countText = Text(count(in: entry), format: .number)
+        let total = countText
+            .font(.capture(.caption)).monospacedDigit()
+            .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.secondary)
         return Button { filter = entry.rawValue } label: {
-            HStack(spacing: 6) {
+            Group {
                 if vertical {
-                    Glyph(symbol: entry.glyph, size: 15, tint: selected ? SwevoStyle.accent : SwevoStyle.secondary)
-                }
-                LocalizedText(entry.title)
-                    .font(.capture(.subheadline, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                if vertical { Spacer(minLength: 0) }
-                if total > 0 {
-                    Text(total, format: .number)
-                        .font(.capture(.caption)).monospacedDigit()
-                        .foregroundStyle(SwevoStyle.secondary)
+                    HStack(spacing: 8) {
+                        glyph
+                        title
+                        Spacer(minLength: 0)
+                        total
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            glyph
+                            total
+                        }
+                        title
+                    }
                 }
             }
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .frame(minWidth: 44, maxWidth: vertical ? .infinity : nil, minHeight: 48,
-                   alignment: vertical ? .leading : .center)
+            .padding(.horizontal, 10).padding(.vertical, 10)
+            .frame(minWidth: 44, maxWidth: .infinity, minHeight: vertical ? 48 : 62, alignment: .leading)
             .foregroundStyle(selected ? SwevoStyle.accent : SwevoStyle.paper)
+            .background(selected ? SwevoStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 12))
             .overlay(alignment: vertical ? .leading : .bottom) {
                 if selected {
-                    Rectangle().fill(SwevoStyle.accent)
-                        .frame(width: vertical ? 2 : nil, height: vertical ? nil : 2)
+                    Capsule().fill(SwevoStyle.accent)
+                        .frame(width: vertical ? 2 : 24, height: vertical ? 20 : 2)
                         .allowsHitTesting(false).accessibilityHidden(true)
                 }
             }
             .contentShape(Rectangle())
         }.buttonStyle(PressStyle())
-            .accessibilityElement(children: .combine)
+            .accessibilityLabel(LocalizedStringKey(entry.title))
+            .accessibilityValue(countText)
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func librarySection(artworkWidth: CGFloat?, artworkHeight: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if showsEmptyState {
-                emptyContent(artworkWidth: artworkWidth, artworkHeight: artworkHeight)
-            }
-            if category == .imports {
-                VideoImportActions(onImported: edit, importing: $importing, presentation: .library)
-                    .padding(.bottom, 4)
-            }
-            if category == .offline {
-                DownloadAllowanceSummary()
-                downloadStatus
+    private func librarySection(in container: GeometryProxy, columnWidth: CGFloat?, stackedRows: Bool) -> some View {
+        let empty = showsEmptyState
+        return VStack(alignment: .leading, spacing: 16) {
+            if empty || category == .imports {
+                sectionIntro(empty: empty, in: container, columnWidth: columnWidth, stacked: stackedRows)
             }
             switch category {
             case .saved:
-                LazyVStack(spacing: 6) {
-                    ForEach(library.favorites) { clip in favoriteRow(clip) }
+                LazyVStack(spacing: 0) {
+                    ForEach(library.favorites) { clip in favoriteRow(clip, stacked: stackedRows) }
                 }
             case .offline:
-                LazyVStack(spacing: 6) {
-                    ForEach(offline.videos) { video in downloadRow(video) }
+                downloadStatus
+                LazyVStack(spacing: 0) {
+                    ForEach(offline.videos) { video in downloadRow(video, stacked: stackedRows) }
                 }
+                DownloadAllowanceSummary()
             case .imports, .exports:
-                LazyVStack(spacing: 6) {
-                    ForEach(localMovies) { movie in movieRow(movie) }
+                LazyVStack(spacing: 0) {
+                    ForEach(localMovies) { movie in movieRow(movie, stacked: stackedRows) }
                 }
             }
         }
     }
 
-    private func emptyContent(artworkWidth: CGFloat?, artworkHeight: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SceneTitle(category.emptyTitle, size: 34)
-            EmptyStateCopy(message: category.emptyMessage)
-            if category.opensOnlineVideos {
-                EmptyStateAction(title: "Browse videos", symbol: .play, action: browseVideos)
-            } else if category == .exports {
-                EmptyStateAction(title: "Open editor", symbol: .edit, action: openEditor)
+    private func sectionIntro(empty: Bool, in container: GeometryProxy, columnWidth: CGFloat?, stacked: Bool) -> some View {
+        let artwork = category.emptyArtwork
+        let width = columnWidth ?? min(container.size.width, 680)
+        let artworkHeight = empty && ArtworkCatalog.has(artwork)
+            ? min(164, width * 0.42, container.size.height * 0.28) : 0
+
+        return VStack(alignment: .leading, spacing: 16) {
+            if empty {
+                VStack(alignment: .leading, spacing: 6) {
+                    SceneTitle(category.emptyTitle, size: 29)
+                    LocalizedText(category.emptyMessage).font(.capture(.subheadline))
+                        .foregroundStyle(SwevoStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: 380, alignment: .leading)
+            }
+            if category == .imports {
+                VideoImportActions(onImported: edit, importing: $importing,
+                                   presentation: empty ? .sourcePair(stacked: stacked) : .library(stacked: stacked))
+            } else if category.opensOnlineVideos {
+                EmptyStateAction(title: "Browse videos", symbol: .play, primary: true, action: browseVideos)
+            } else {
+                EmptyStateAction(title: "Edit a video", symbol: .edit, primary: true, action: openEditor)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, artworkHeight * 0.8)
+        .padding(.top, artworkHeight * 0.76)
         .background(alignment: .top) {
-            SceneArtwork(name: category.emptyArtwork)
-                .frame(width: artworkWidth, height: artworkHeight)
-                .opacity(0.94)
+            if artworkHeight > 0 {
+                SceneImage(name: artwork)
+                    .frame(width: columnWidth == nil ? width : nil, height: artworkHeight)
+                    .mask {
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black, location: 0.18),
+                            .init(color: .black, location: 0.50),
+                            .init(color: .black.opacity(0.25), location: 0.76),
+                            .init(color: .clear, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                    }
+                    .mask {
+                        if columnWidth != nil || width < container.size.width {
+                            LinearGradient(stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black, location: 0.12),
+                                .init(color: .black, location: 0.90),
+                                .init(color: .clear, location: 1)
+                            ], startPoint: .leading, endPoint: .trailing)
+                        } else {
+                            Color.black
+                        }
+                    }
+            }
         }
     }
 
@@ -276,74 +451,77 @@ struct LibraryView: View {
                     }
                 }
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 6))
+                .swevoGlass(cornerRadius: 16)
         }
     }
 
-    private func favoriteRow(_ clip: LessonClip) -> some View {
-        HStack(alignment: .center, spacing: 8) {
+    private func favoriteRow(_ clip: LessonClip, stacked: Bool) -> some View {
+        let url = offline.cached(clip.id)?.url ?? clip.playbackURL
+        return HStack(spacing: 4) {
             Button { player = PlayerRoute(clips: library.favorites, startID: clip.id) } label: {
-                HStack(spacing: 10) {
-                    playableCover(clip.coverURL, width: 92, height: 56)
-                    lessonTitle(clip)
-                }.contentShape(Rectangle())
+                fileLabel(clip.title, stacked: stacked,
+                          thumbnail: VideoFileThumbnail(url: url, maximumSize: 480, fallbackCover: clip.coverURL),
+                          actionGlyph: .play) {
+                    if let channel = clip.channel.nilIfBlank { Text(verbatim: channel) }
+                }
             }.buttonStyle(PressStyle())
-            removeButton(.bookmark, title: "Remove from favorites") { library.toggle(clip) }
+            IconButton(symbol: .bookmark, label: "Remove from favorites") { library.toggle(clip) }
         }
         .modifier(LibraryRowSurface())
     }
 
-    private func playableCover(_ url: URL?, width: CGFloat, height: CGFloat) -> some View {
-        MediaCover(url: url)
-            .frame(width: width, height: height)
-            .clipShape(.rect(cornerRadius: 4))
-            .overlay(alignment: .bottomTrailing) {
-                Glyph(symbol: .play, size: 15, tint: SwevoStyle.paper)
-                    .frame(width: 28, height: 28)
-                    .background(SwevoStyle.ink.opacity(0.88), in: RoundedRectangle(cornerRadius: 3))
-                    .padding(3).allowsHitTesting(false)
-            }.accessibilityHidden(true)
-    }
-
-    private func lessonTitle(_ clip: LessonClip) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: clip.title).font(.capture(.subheadline, weight: .semibold)).lineLimit(3)
-            if !clip.channel.isEmpty {
-                Text(verbatim: clip.channel).font(.capture(.caption))
-                    .foregroundStyle(SwevoStyle.secondary).lineLimit(2)
-            }
-        }.fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func downloadRow(_ video: OfflineVideo) -> some View {
-        let available = video.hasLocalFile
-        return VStack(alignment: .leading, spacing: 6) {
-            Button { playDownload(video) } label: {
-                HStack(spacing: 12) {
-                    VideoFileThumbnail(url: video.url, fallbackCover: video.clip.coverURL)
-                        .frame(width: 72, height: 46)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: video.displayFilename).font(.capture(.subheadline, weight: .semibold))
-                        LocalizedText(available ? "Available offline" : "Download needed")
-                            .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }.contentShape(Rectangle())
-            }.buttonStyle(PressStyle())
-            HStack(spacing: 8) {
-                if available {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) { downloadActions(video) }.fixedSize(horizontal: true, vertical: false)
-                        VStack(alignment: .leading, spacing: 8) { downloadActions(video) }
+    private func fileLabel<Detail: View>(_ filename: String, stacked: Bool, thumbnail: VideoFileThumbnail,
+                                         actionGlyph: SwevoGlyph? = nil, @ViewBuilder detail: () -> Detail) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                             : AnyLayout(HStackLayout(spacing: 14))
+        return layout {
+            thumbnail
+                .aspectRatio(4.0 / 3.0, contentMode: .fit)
+                .frame(maxWidth: stacked ? 160 : 116)
+                .clipShape(.rect(cornerRadius: 8))
+                .overlay(alignment: .bottomTrailing) {
+                    if let actionGlyph {
+                        Glyph(symbol: actionGlyph, size: 12, tint: SwevoStyle.paper)
+                            .frame(width: 26, height: 26)
+                            .background(SwevoStyle.ink.opacity(0.88), in: RoundedRectangle(cornerRadius: 5))
+                            .padding(4).allowsHitTesting(false).accessibilityHidden(true)
                     }
+                }
+            VStack(alignment: .leading, spacing: 5) {
+                Text(verbatim: filename)
+                    .font(.capture(.headline)).foregroundStyle(SwevoStyle.paper)
+                detail()
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func downloadRow(_ video: OfflineVideo, stacked: Bool) -> some View {
+        let available = video.hasLocalFile
+        let actionsLayout = stacked || typeSize > .xLarge
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+            : AnyLayout(HStackLayout(spacing: 8))
+        return VStack(alignment: .leading, spacing: 2) {
+            Button { playDownload(video) } label: {
+                fileLabel(video.displayFilename, stacked: stacked,
+                          thumbnail: VideoFileThumbnail(url: video.url, maximumSize: 480, fallbackCover: video.clip.coverURL),
+                          actionGlyph: available ? .play : nil) {
+                    LocalizedText(available ? "Available offline" : "Download needed")
+                }
+            }.buttonStyle(PressStyle())
+            HStack(alignment: .bottom, spacing: 8) {
+                if available {
+                    actionsLayout { downloadActions(video) }
                 } else {
                     Button("Download again") { Task { await offline.download(video.clip) } }
                         .buttonStyle(LibraryActionStyle()).disabled(offline.busy)
                 }
                 Spacer(minLength: 0)
-                removeButton(.close, title: "Remove download") { removingDownload = video }
+                IconButton(symbol: .close, label: "Remove download") { removingDownload = video }
             }
         }
         .modifier(LibraryRowSurface())
@@ -375,37 +553,26 @@ struct LibraryView: View {
         }
     }
 
-    private func movieRow(_ movie: PracticeRecording) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 12) {
-                if movie.isAudio {
-                    HStack(spacing: 12) {
-                        VideoFileThumbnail(url: library.url(for: movie), isAudio: true)
-                            .frame(width: 64, height: 42)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        Text(verbatim: movie.displayFilename)
-                            .font(.capture(.subheadline, weight: .semibold))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                } else {
-                    VideoFileButton(url: library.url(for: movie), filename: movie.displayFilename, date: movie.date) { edit(movie) }
-                }
-                removeButton(.close, title: "Delete local file") { removing = movie }
+    private func movieRow(_ movie: PracticeRecording, stacked: Bool) -> some View {
+        let thumbnail = VideoFileThumbnail(url: library.url(for: movie), maximumSize: 480, isAudio: movie.isAudio)
+        let label = fileLabel(movie.displayFilename, stacked: stacked, thumbnail: thumbnail,
+                              actionGlyph: movie.isAudio ? nil : .edit) {
+            LocalizedDateText(date: movie.date)
+        }
+        return VStack(alignment: .leading, spacing: 2) {
+            if movie.isAudio {
+                label
+            } else {
+                Button { edit(movie) } label: { label }.buttonStyle(PressStyle())
             }
-            Button(LocalizedStringKey(sharingMovieID == movie.id ? "Preparing export…" : "Share")) { shareMovie(movie) }
-                .buttonStyle(LibraryActionStyle()).disabled(sharingMovieID != nil)
+            HStack(spacing: 8) {
+                Button(LocalizedStringKey(sharingMovieID == movie.id ? "Preparing export…" : "Share")) { shareMovie(movie) }
+                    .buttonStyle(LibraryActionStyle()).disabled(sharingMovieID != nil)
+                Spacer(minLength: 0)
+                IconButton(symbol: .close, label: "Delete local file") { removing = movie }
+            }
         }
         .modifier(LibraryRowSurface())
-    }
-
-    private func removeButton(_ symbol: SwevoGlyph, title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Glyph(symbol: symbol, size: 16, tint: SwevoStyle.paper)
-                .frame(width: 36, height: 36)
-                .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 5))
-                .frame(width: 44, height: 44).contentShape(Rectangle())
-        }.buttonStyle(PressStyle()).accessibilityLabel(LocalizedStringKey(title))
     }
 
     private func playDownload(_ video: OfflineVideo) {
@@ -435,8 +602,11 @@ private struct LibraryRowSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 9)
-            .overlay(alignment: .bottom) { Rectangle().fill(SwevoStyle.line).frame(height: 1).allowsHitTesting(false) }
+            .padding(.vertical, 12)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(SwevoStyle.line).frame(height: 1)
+                    .allowsHitTesting(false).accessibilityHidden(true)
+            }
     }
 }
 
@@ -444,13 +614,13 @@ private struct LibraryActionStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.capture(.footnote, display: true))
-            .multilineTextAlignment(.center)
+            .font(.capture(.footnote, weight: .semibold))
+            .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 13).padding(.vertical, 8)
-            .frame(minWidth: 44, minHeight: 44)
+            .padding(.horizontal, 8).padding(.vertical, 8)
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
             .foregroundStyle(SwevoStyle.accent)
-            .background(SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 10))
+            .background(configuration.isPressed ? SwevoStyle.raised : .clear, in: RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
             .opacity(!enabled ? 0.58 : configuration.isPressed ? 0.72 : 1)
     }
@@ -496,7 +666,7 @@ struct OfflineDownloadButton: View {
                     ActionButton(title: "Retry", primary: false) { Task { await offline.retryCompletion() } }
                 }
             }
-        }.sheet(isPresented: $downloadGate) { MembershipView(rewardKind: .download) }
+        }.fullScreenCover(isPresented: $downloadGate) { MembershipView(rewardKind: .download) }
     }
 }
 
@@ -505,19 +675,27 @@ struct VideoExportEntry: View {
     let clip: LessonClip
     var compact = false
     @State private var showingExport = false
+    @State private var showingMembership = false
     @EnvironmentObject private var commerce: CommerceStore
     var body: some View {
         Group {
             if compact {
-                Button("Export") { showingExport = true }.buttonStyle(LibraryActionStyle())
+                Button("Export", action: openExport).buttonStyle(LibraryActionStyle())
             } else {
-                ActionButton(title: "Export video", primary: false) { showingExport = true }
+                ActionButton(title: "Export video", primary: false, action: openExport)
             }
         }.accessibilityIdentifier("player.openExport")
-            .sheet(isPresented: $showingExport) {
-                if commerce.canExportMedia { OfflineExportSheet(clip: clip) }
-                else { MembershipView(exportRequired: true) }
+            .sheet(isPresented: $showingExport) { OfflineExportSheet(clip: clip) }
+            .fullScreenCover(isPresented: $showingMembership, onDismiss: {
+                if commerce.canExportMedia { showingExport = true }
+            }) {
+                MembershipView(exportRequired: true)
             }
+    }
+
+    private func openExport() {
+        if commerce.canExportMedia { showingExport = true }
+        else { showingMembership = true }
     }
 }
 
@@ -658,7 +836,7 @@ private struct OfflineExportButton: View {
             if let exportError { ErrorNote(message: exportError) }
         }
         .sheet(item: $sharing) { ShareSheet(items: [$0.url]) }
-        .sheet(isPresented: $downloadGate) { MembershipView(exportRequired: true) }
+        .fullScreenCover(isPresented: $downloadGate) { MembershipView(exportRequired: true) }
         .onDisappear { exportTask?.cancel() }
     }
 
@@ -783,6 +961,6 @@ struct DownloadAllowanceSummary: View {
             .accessibilityElement(children: .contain)
             .onAppear { quota.resetIfNeeded() }
             .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in quota.resetIfNeeded() }
-            .sheet(isPresented: $showingReward) { MembershipView(rewardKind: .download) }
+            .fullScreenCover(isPresented: $showingReward) { MembershipView(rewardKind: .download) }
     }
 }

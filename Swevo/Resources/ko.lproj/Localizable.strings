@@ -26,6 +26,7 @@
 "Access through %@." = "%@까지 이용 가능";
 "Ads are unavailable with your current privacy choices." = "현재 개인정보 설정으로는 광고를 이용할 수 없습니다.";
 "Advertising privacy" = "광고 개인정보 설정";
+"Couldn’t open ad privacy settings. Try again." = "광고 개인정보 설정을 열 수 없습니다. 다시 시도해 주세요.";
 "All" = "전체";
 "All notes can be read offline. Original summaries with links to further reading." = "모든 글은 오프라인으로 읽을 수 있습니다. 직접 작성한 요약과 더 읽을 수 있는 링크를 제공합니다.";
 "Also called the French Open, this major is played on red clay. The court's familiar colour comes from a fine layer of crushed brick over its underlying structure." = "프랑스 오픈이라고도 불리며 붉은 클레이 코트에서 열립니다. 코트의 색은 아래 구조 위에 얇게 깔린 분쇄 벽돌층에서 나옵니다.";
@@ -536,6 +537,9 @@
 "Subscribe" = "구독하기";
 
 "Billed every %@" = "%@마다 결제";
+"Subscription plans" = "구독 요금제";
+"Price unavailable" = "가격을 불러올 수 없음";
+"Reload plans" = "요금제 다시 불러오기";
 
 "Apple updated this plan. Review the price and billing period, then continue." = "Apple의 요금제 정보가 변경되었습니다. 가격과 결제 주기를 확인한 후 계속해 주세요.";
 
@@ -554,6 +558,32 @@
 
 "Plan the next shot" = "다음 숏 계획하기";
 "Camera move" = "카메라 움직임";
+"Camera moves" = "카메라 움직임";
+"Shot examples" = "카메라 움직임 예시";
+"Practice records" = "연습 기록";
+"Follow at walking pace" = "걷는 속도로 피사체 따라가기";
+"Reveal from behind an edge" = "가림막 뒤에서 피사체 드러내기";
+"Use layers for parallax" = "여러 층으로 시차 효과 만들기";
+"How to shoot" = "촬영 순서";
+"Try this camera move" = "이 카메라 움직임 연습하기";
+"Keep a steady distance from a moving subject." = "움직이는 피사체와 일정한 거리를 유지하세요.";
+"Rehearse the path" = "동선을 미리 걸어 보기";
+"Agree on a short route with your subject and walk it together. Choose a clear path and look where you are going." = "피사체와 짧은 동선을 정하고 함께 걸어 보세요. 장애물이 없는 길을 골라 진행 방향을 확인하며 걸으세요.";
+"Match their rhythm" = "피사체의 보폭에 맞추기";
+"Walk at the same speed and hold the subject at the same point in the frame. Leave room in the direction they are moving." = "같은 속도로 걸으며 프레임 안에서 피사체의 위치를 일정하게 유지하세요. 피사체가 움직이는 방향에 여백을 두세요.";
+"If your distance changes, reset before the next take." = "거리가 달라졌다면 다음 테이크 전에 원래 거리로 돌아오세요.";
+"Start with the subject hidden behind the foreground." = "처음에는 전경에 가려 피사체가 보이지 않게 시작하세요.";
+"Choose a foreground" = "전경에 둘 물체 고르기";
+"Start with a wall or doorframe close to the lens. Keep the subject visible at your planned end position." = "벽이나 문틀을 렌즈 가까이에 두고 시작하세요. 움직임이 끝나는 위치에서는 피사체가 보이는지 확인하세요.";
+"Move across the edge" = "가장자리를 지나 옆으로 이동하기";
+"Slide sideways until the subject appears. Stop before you add a second move, so the reveal reads clearly." = "피사체가 보일 때까지 옆으로 이동하세요. 피사체가 드러나는 순간이 분명하도록 다른 움직임을 더하기 전에 멈추세요.";
+"Look at the final frame first. Plan the reveal backward from it." = "마지막 구도를 먼저 확인하세요. 그 구도를 기준으로 피사체를 드러낼 동선을 정하세요.";
+"Show depth with a close foreground and a distant subject." = "가까운 전경과 멀리 있는 피사체로 깊이감을 만드세요.";
+"Space the layers" = "전경과 피사체 사이에 거리 두기";
+"Find a nearby plant or post and place the subject farther away. Check that both are legible in the same frame." = "가까운 식물이나 기둥을 고르고 피사체를 더 멀리 배치하세요. 두 요소가 같은 프레임에서 뚜렷이 보이는지 확인하세요.";
+"Take a short side step" = "옆으로 짧게 한 걸음 옮기기";
+"Move parallel to the subject. The foreground will cross the frame faster than the background, giving the shot depth." = "피사체와 평행하게 움직이세요. 전경이 배경보다 빠르게 화면을 가로질러 깊이감이 생깁니다.";
+"A small, even move is enough when your foreground is close." = "전경이 가까우면 짧고 일정한 움직임으로도 충분합니다.";
 "Push in" = "다가가기";
 "Follow" = "따라가기";
 "Reveal" = "리빌";
@@ -602,9 +632,9 @@
 "Couldn’t load lessons" = "레슨을 불러오지 못했어요";
 "Search the web with your original input." = "입력한 내용으로 웹에서 검색할 수 있어요.";
 
-"Swevo is starting" = "Swevo 시작 중";
-"Connecting to Swevo…" = "Swevo에 연결 중…";
-"Couldn’t connect to Swevo" = "Swevo에 연결하지 못했어요";
+"Kstep is starting" = "Kstep 시작 중";
+"Connecting to Kstep…" = "Kstep에 연결 중…";
+"Couldn’t connect to Kstep" = "Kstep에 연결하지 못했어요";
 "Edit a video" = "동영상 편집";
 "Lesson search" = "레슨 검색";
 "Back to search" = "검색으로 돌아가기";
@@ -615,7 +645,7 @@
 "Paste a link or type a code" = "링크를 붙여넣거나 코드를 입력";
 "Link help" = "링크 사용법";
 "Find lesson" = "레슨 검색";
-"Swevo hasn’t connected yet. Try again in a moment." = "Swevo에 연결 중이에요. 잠시 후 다시 시도하세요.";
+"Kstep hasn’t connected yet. Try again in a moment." = "Kstep에 연결 중이에요. 잠시 후 다시 시도하세요.";
 "2. Paste or type it" = "2. 붙여넣거나 직접 입력";
 "If you type the code, match the uppercase and lowercase letters." = "코드를 입력할 때는 대문자와 소문자를 구분하세요.";
 "3. Find the lesson" = "3. 레슨 검색";
@@ -623,6 +653,7 @@
 "Loading lessons…" = "레슨 불러오는 중…";
 "Searching for lessons…" = "레슨 검색 중…";
 "Daily view limit reached" = "일일 시청 한도에 도달했어요";
+"Continue watching" = "계속 시청하기";
 "Playback unavailable" = "재생할 수 없어요";
 "Couldn’t load video" = "동영상을 불러오지 못했어요";
 "Save to favorites" = "즐겨찾기에 저장";
@@ -630,7 +661,7 @@
 "Tap Save while watching a lesson to add it here." = "레슨을 시청하면서 저장을 누르면 여기에 추가돼요.";
 "Tap Download while watching a lesson to save it for offline viewing." = "레슨 시청 중에 다운로드를 누르면 오프라인에서 볼 수 있어요.";
 "This removes the download from this device." = "이 기기에서 다운로드한 동영상이 삭제돼요.";
-"This deletes the selected copy from your Swevo library." = "선택한 복사본이 Swevo 보관함에서 삭제돼요.";
+"This deletes the selected copy from your Kstep library." = "선택한 복사본이 Kstep 보관함에서 삭제돼요.";
 "Download for offline viewing" = "오프라인 시청용으로 다운로드";
 "Ready to watch offline" = "오프라인에서 볼 수 있어요";
 "View offline videos" = "오프라인 동영상 보기";
@@ -650,12 +681,14 @@
 "Crop, rotate or mirror a video." = "동영상을 자르거나 회전하거나 좌우로 뒤집으세요.";
 "Trim a clip and adjust its framing, speed or audio." = "클립 길이를 다듬고 구도, 속도, 오디오를 조정하세요.";
 "Change video" = "동영상 바꾸기";
+"Current video" = "현재 동영상";
 "Exports appear in Library under Exports." = "내보낸 파일은 보관함의 ‘내보낸 파일’에서 볼 수 있어요.";
 "Import a video" = "동영상 가져오기";
-"Swevo makes a copy for editing." = "Swevo가 편집용 복사본을 만들어요.";
+"Your original stays untouched." = "원본 동영상은 그대로 유지됩니다.";
+"Kstep makes a copy for editing." = "Kstep가 편집용 복사본을 만들어요.";
 "Choose from Files" = "파일에서 선택";
 "Trim video" = "동영상 길이 다듬기";
-"Swevo crops from the center. Tap Preview changes to check the framing." = "Swevo는 화면 중앙을 기준으로 잘라요. 변경사항 미리보기에서 구도를 확인하세요.";
+"Kstep crops from the center. Tap Preview changes to check the framing." = "Kstep는 화면 중앙을 기준으로 잘라요. 변경사항 미리보기에서 구도를 확인하세요.";
 "Video speed" = "동영상 속도";
 "Audio track" = "오디오 트랙";
 "Export this video’s audio as an M4A file. The video must contain an audio track." = "이 동영상의 소리를 M4A 파일로 내보내세요. 오디오 트랙이 필요해요.";
@@ -672,13 +705,16 @@
 "Account" = "계정";
 "View membership" = "멤버십 보기";
 "View Plus plans" = "Plus 요금제 보기";
+"View plans" = "요금제 보기";
 "No ad available" = "시청할 수 있는 광고가 없어요";
 "Keep this take" = "이 테이크 채택";
 "Camera shake" = "카메라 흔들림";
 "Horizon drift" = "수평선 기울어짐";
 "Lost focus" = "초점 놓침";
 "Plus benefits" = "Plus 혜택";
-"Swevo Plus" = "Swevo Plus";
+"Kstep Plus" = "Kstep Plus";
+"Video and audio export" = "영상 및 오디오 내보내기";
+"MP4 up to 1080p · M4A" = "MP4(최대 1080p) · M4A";
 "No daily limits" = "일일 한도 없음";
 "Watch and download lessons." = "강좌를 시청하고 다운로드하세요.";
 "Up to 1080p" = "최대 1080p";
@@ -689,7 +725,7 @@
 "No daily viewing or download limits" = "시청 및 다운로드 일일 한도 없음";
 "Save lessons to watch offline." = "강좌를 저장해 오프라인에서 시청하세요.";
 "Skip opening ads" = "앱을 열 때 광고 없음";
-"Launch or return to Swevo without an opening ad." = "Swevo를 실행하거나 다시 열 때 시작 광고가 표시되지 않아요.";
+"Launch or return to Kstep without an opening ad." = "Kstep를 실행하거나 다시 열 때 시작 광고가 표시되지 않아요.";
 "MP4 video export" = "MP4 동영상 내보내기";
 "Export your edits at up to 1080p." = "편집한 동영상을 최대 1080p로 내보내세요.";
 "Save one setup per camera move on this device." = "카메라 움직임마다 설정 하나를 이 기기에 저장할 수 있어요.";
@@ -725,6 +761,7 @@
 "Photos" = "사진";
 "Find video" = "동영상 찾기";
 "Browse videos" = "동영상 둘러보기";
+"Find a shot to try." = "따라 찍어 볼 장면을 찾아보세요.";
 "Video collections" = "동영상 모음";
 "Couldn’t load collections" = "동영상 모음을 불러오지 못했습니다";
 "Connecting to the video service. Try again in a moment." = "동영상 서비스에 연결 중입니다. 잠시 후 다시 시도하세요.";
@@ -739,7 +776,13 @@
 "No matching video" = "일치하는 동영상이 없습니다";
 "No videos available" = "이용 가능한 동영상이 없습니다";
 "No more videos are available right now. Try again." = "지금은 더 볼 수 있는 동영상이 없습니다. 다시 시도하세요.";
-"Videos you open appear here." = "열어 본 동영상이 여기에 표시됩니다.";
+"Open a video to find it here later." = "동영상을 열면 나중에 여기에서 다시 볼 수 있어요.";
+"No recent videos" = "최근에 연 동영상 없음";
+"Choose a video" = "동영상 선택";
+"Search files" = "파일 검색";
+"Clear search" = "검색어 지우기";
+"No matches" = "일치하는 항목 없음";
+"Try a different name." = "다른 이름으로 검색해 보세요.";
 "Save a video while watching to find it here." = "시청 중 저장한 동영상이 여기에 표시됩니다.";
 "Download a video to watch it without a connection." = "동영상을 다운로드하면 오프라인에서 볼 수 있습니다.";
 "Mark a range" = "구간 표시";
@@ -753,6 +796,7 @@
 "Remove range" = "구간 삭제";
 "Choose a start and end for the range." = "구간의 시작과 끝을 지정하세요.";
 "Today’s video allowance" = "오늘의 동영상 이용 한도";
+"%@ of %@" = "%2$@개 중 %1$@개";
 "Browse and practice" = "동영상과 촬영 연습";
 "Paste a video link" = "동영상 링크 붙여넣기";
 "Video link" = "동영상 링크";
@@ -766,8 +810,8 @@
 "No video was returned. Check the link and try again later." = "동영상을 찾을 수 없습니다. 링크를 확인하고 나중에 다시 시도하세요.";
 "%@ every %@. Renews automatically until canceled." = "%2$@마다 %1$@. 취소할 때까지 자동으로 갱신됩니다.";
 "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected." = "구매가 확인되었습니다. Plus 이용 권한이 아직 업데이트되지 않았습니다. 인터넷에 연결한 후 다시 시도하세요.";
-"Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "이 Apple 구매를 Swevo 계정에 연결할 수 없습니다. 이용 권한을 복원하려면 지원팀에 문의하세요.";
-"This purchase is linked to another Swevo account. Contact support for help restoring access." = "이 구매는 다른 Swevo 계정에 연결되어 있습니다. 이용 권한을 복원하려면 지원팀에 문의하세요.";
+"Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "이 Apple 구매를 Kstep 계정에 연결할 수 없습니다. 이용 권한을 복원하려면 지원팀에 문의하세요.";
+"This purchase is linked to another Kstep account. Contact support for help restoring access." = "이 구매는 다른 Kstep 계정에 연결되어 있습니다. 이용 권한을 복원하려면 지원팀에 문의하세요.";
 "Some purchases couldn’t be restored. Try again." = "일부 구매를 복원할 수 없습니다. 다시 시도하세요.";
 "Couldn’t verify Plus access. Try again when connected." = "Plus 이용 권한을 확인할 수 없습니다. 인터넷에 연결한 후 다시 시도하세요.";
 "No active Plus access on this account." = "이 계정에 활성 Plus 이용 권한이 없습니다.";
@@ -790,3 +834,29 @@
 "Couldn’t create the comparison image. Try again." = "비교 이미지를 만들 수 없습니다. 다시 시도하세요.";
 "JPEG stills and comparison images" = "JPEG 프레임 및 비교 이미지";
 "Share three frames or one image with the range name and timestamps." = "프레임 세 장 또는 구간 이름과 시간 표시가 담긴 이미지 한 장을 공유하세요.";
+"Edited preview" = "편집 미리보기";
+"Looping" = "반복 재생 중";
+"Pause video" = "동영상 일시 정지";
+"Preparing…" = "준비 중…";
+"Set up the shot" = "촬영 준비";
+"Film and log a take" = "촬영하고 기록하기";
+"Film with your camera app, then log what you noticed." = "카메라 앱으로 촬영한 뒤 눈에 띈 점을 여기에 기록하세요.";
+"Finish and review" = "완료하고 다시 보기";
+"Import a video to mark a range, loop it, and compare frames." = "동영상을 가져와 구간을 표시하고 반복 재생하며 프레임을 비교하세요.";
+"Share three-frame collage" = "세 프레임 콜라주 공유";
+"Set start" = "시작점 설정";
+"Set end" = "끝점 설정";
+"Save and loop" = "저장하고 반복 재생";
+"Show original" = "원본 동영상 보기";
+"Scrub to a frame, then set the start or end." = "재생 위치를 원하는 프레임으로 옮긴 뒤 시작점이나 끝점을 설정하세요.";
+"Compare 3 frames" = "프레임 3개 비교";
+"Continue review" = "이어서 검토";
+"Import video" = "동영상 가져오기";
+"Video unavailable" = "동영상을 열 수 없음";
+"All movements" = "모든 움직임";
+"Pending import" = "영상 추가 대기";
+"No sessions awaiting video" = "영상을 추가할 세션이 없습니다";
+"No matching sessions" = "조건에 맞는 세션이 없습니다";
+"Clear filters" = "필터 초기화";
+"Kstep’s online service is not configured yet. Local editing is available." = "Kstep의 온라인 서비스가 아직 설정되지 않았습니다. 기기에 있는 동영상은 편집할 수 있습니다.";
+"A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "Kstep에 안전하게 연결할 수 없습니다. 네트워크나 VPN을 확인한 뒤 다시 시도하세요. 문제가 계속되면 서비스가 일시적으로 중단되었을 수 있습니다.";

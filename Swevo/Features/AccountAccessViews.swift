@@ -106,19 +106,25 @@ struct PolicyLinks: View {
     private var linkLayout: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: compact ? 16 : 10) { links }
+                .fixedSize(horizontal: true, vertical: false)
             VStack(alignment: .leading, spacing: compact ? 0 : 10) { links }
         }.font(.capture(.footnote, weight: .medium)).foregroundStyle(SwevoStyle.accent)
     }
     @ViewBuilder private var links: some View {
         if let url = api.configuration.termsURL {
-            Button("Terms of Use") { document = PolicyDocument(title: "Terms of Use", url: url) }
-                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .frame(minHeight: 44)
+            policyLink("Terms of Use", url: url)
         }
         if let url = api.configuration.privacyURL {
-            Button("Privacy Policy") { document = PolicyDocument(title: "Privacy Policy", url: url) }
-                .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .frame(minHeight: 44)
+            policyLink("Privacy Policy", url: url)
+        }
+    }
+
+    private func policyLink(_ title: String, url: URL) -> some View {
+        Button { document = PolicyDocument(title: title, url: url) } label: {
+            LocalizedText(title)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minWidth: 44, minHeight: compact ? 44 : nil, alignment: .leading)
+                .contentShape(Rectangle())
         }
     }
 }
@@ -289,90 +295,119 @@ struct AccountSettingsSection: View {
     @EnvironmentObject private var commerce: CommerceStore
     @EnvironmentObject private var ads: RewardedAds
     @EnvironmentObject private var accountAccess: AccountAccessFlow
-    @State private var document: PolicyDocument?
     private var unavailable: Bool { accountAccess.isBusy || commerce.busy || commerce.preparingPurchase || ads.busy || ads.isPreparingAppOpen || ads.isPresenting }
+    private var hasPolicies: Bool { api.configuration.privacyURL != nil || api.configuration.termsURL != nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            LocalizedText("Settings").font(.capture(.title3, weight: .semibold))
+        VStack(alignment: .leading, spacing: 14) {
+            LocalizedText("Settings").font(.capture(.headline))
                 .accessibilityAddTraits(.isHeader)
-            Button { languagePicker = true } label: {
-                AccountMenuRow(title: "App language", detail: AppLanguage(rawValue: languageCode)?.nativeName ?? "Follow system",
-                               symbol: .settings)
-            }.buttonStyle(PressStyle())
-                .swevoGlass(cornerRadius: 16)
-                .accessibilityIdentifier("account.language")
-            if api.configuration.privacyURL != nil || api.configuration.termsURL != nil
-                || api.configuration.websiteURL != nil || ads.privacyOptionsRequired {
-                VStack(spacing: 0) {
-                    if let url = api.configuration.privacyURL {
-                        Button { document = PolicyDocument(title: "Privacy Policy", url: url) } label: {
-                            AccountMenuRow(title: "Privacy Policy")
-                        }
-                    }
-                    if let url = api.configuration.termsURL {
-                        if api.configuration.privacyURL != nil { rowDivider }
-                        Button { document = PolicyDocument(title: "Terms of Use", url: url) } label: {
-                            AccountMenuRow(title: "Terms of Use")
-                        }
-                    }
-                    if let website = api.configuration.websiteURL {
-                        if api.configuration.privacyURL != nil || api.configuration.termsURL != nil { rowDivider }
-                        Button {
-                            websiteError = nil
-                            openURL(website) { accepted in
-                                if !accepted { websiteError = "The browser could not open. Please try again." }
-                            }
-                        } label: {
-                            AccountMenuRow(title: "Official website")
-                        }.accessibilityIdentifier("account.officialWebsite")
+            languagePreference
+            if hasPolicies || ads.privacyOptionsRequired {
+                VStack(alignment: .leading, spacing: 2) {
+                    if hasPolicies {
+                        LocalizedText("Privacy & terms").font(.capture(.subheadline, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        PolicyLinks(compact: true)
                     }
                     if ads.privacyOptionsRequired {
-                        if api.configuration.privacyURL != nil || api.configuration.termsURL != nil
-                            || api.configuration.websiteURL != nil { rowDivider }
-                        Button { Task { await ads.privacyOptions() } } label: {
-                            AccountMenuRow(title: "Advertising privacy")
+                        settingsLink("Advertising privacy") {
+                            Task { await ads.privacyOptions() }
                         }
+                        .disabled(ads.isPreparingPrivacy)
+                        .accessibilityIdentifier("account.adPrivacy")
+                        if let message = ads.privacyOptionsError { ErrorNote(message: message) }
                     }
-                }.buttonStyle(PressStyle())
-                    .background(SwevoStyle.surface, in: RoundedRectangle(cornerRadius: 16))
-                    .disabled(unavailable)
-            }
-            if let websiteError { ErrorNote(message: websiteError) }
-            if let error = ads.error { ErrorNote(message: error) }
-        }
-            .sheet(item: $document) { PolicyBrowser(document: $0) }
-            .sheet(isPresented: $languagePicker) { LanguagePicker() }
-    }
-
-    private var rowDivider: some View {
-        Divider().overlay(SwevoStyle.line).padding(.horizontal, 14).accessibilityHidden(true)
-    }
-
-}
-
-// Plain native rows with the original raster navigation glyph.
-private struct AccountMenuRow: View {
-    let title: String
-    var detail: String? = nil
-    var symbol: SwevoGlyph? = nil
-
-    var body: some View {
-        HStack(spacing: 12) {
-            if let symbol { Glyph(symbol: symbol, size: 18, tint: SwevoStyle.accent) }
-            VStack(alignment: .leading, spacing: 4) {
-                LocalizedText(title).font(.capture(.subheadline, weight: .medium))
-                    .foregroundStyle(SwevoStyle.paper)
-                if let detail {
-                    LocalizedText(detail).font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
                 }
-            }.fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            Glyph(symbol: .back, size: 12, tint: SwevoStyle.secondary)
-                .rotationEffect(.degrees(180)).frame(width: 20, height: 24)
-                .allowsHitTesting(false)
-        }.padding(.horizontal, 14).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
-            .contentShape(.interaction, Rectangle())
+                .disabled(unavailable)
+                Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+            }
+            settingsFooter
+            if let websiteError { ErrorNote(message: websiteError) }
+        }
+        .sheet(isPresented: $languagePicker) { LanguagePicker() }
+    }
+
+    private var languagePreference: some View {
+        let title = HStack(spacing: 10) {
+            Glyph(symbol: .settings, size: 17, tint: SwevoStyle.accent)
+            LocalizedText("App language").font(.capture(.subheadline, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        let selectedLanguage = HStack(spacing: 8) {
+            Group {
+                if let language = AppLanguage(rawValue: languageCode) {
+                    Text(verbatim: language.nativeName)
+                } else {
+                    LocalizedText("Follow system")
+                }
+            }
+            .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            Glyph(symbol: .back, size: 11, tint: SwevoStyle.accent).rotationEffect(.degrees(180))
+        }
+        return Button { languagePicker = true } label: {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    title.fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    selectedLanguage.fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    title
+                    selectedLanguage
+                }
+            }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                Divider().overlay(SwevoStyle.line).allowsHitTesting(false).accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("account.language")
+    }
+
+    @ViewBuilder private var settingsFooter: some View {
+        let version = LocalizedText("Version %@", api.configuration.version)
+            .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        if let website = api.configuration.websiteURL {
+            let websiteLink = settingsLink("Official website", symbol: .link) {
+                websiteError = nil
+                openURL(website) { accepted in
+                    if !accepted { websiteError = "The browser could not open. Please try again." }
+                }
+            }.disabled(unavailable).accessibilityIdentifier("account.officialWebsite")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    websiteLink.fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    version.fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    websiteLink
+                    version
+                }
+            }
+        } else {
+            version
+        }
+    }
+
+    private func settingsLink(_ title: String, symbol: SwevoGlyph? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if let symbol { Glyph(symbol: symbol, size: 14, tint: SwevoStyle.accent) }
+                LocalizedText(title)
+                    .font(.capture(.footnote, weight: .medium)).foregroundStyle(SwevoStyle.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
     }
 }

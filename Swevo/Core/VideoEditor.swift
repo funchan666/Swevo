@@ -37,7 +37,7 @@ func editableVideoDuration(for asset: AVURLAsset) async throws -> Double {
 final class VideoEditor: ObservableObject {
     @Published var recipe = EditRecipe()
     @Published private(set) var duration: Double = 0
-    @Published private(set) var thumbnails: [UIImage] = []
+    @Published private(set) var thumbnails: [UIImage?] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isExporting = false
     @Published private(set) var isPreparingPreview = false
@@ -50,8 +50,9 @@ final class VideoEditor: ObservableObject {
     private var revision = UUID()
     private var cancelRequested = false
     private var previewExporter: AVAssetExportSession?
-    private var previewURL: URL?
+    @Published private var previewURL: URL?
     private var previewRevision = UUID()
+    var isShowingSource: Bool { previewURL == nil }
 
     func open(_ url: URL, onReady: () -> Void) async {
         clearRenderedPreview()
@@ -82,13 +83,16 @@ final class VideoEditor: ObservableObject {
             onReady()
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 180, height: 180)
-            for step in 0..<7 {
+            generator.maximumSize = CGSize(width: 264, height: 264)
+            let frameCount = 7
+            thumbnails = Array(repeating: nil, count: frameCount)
+            for step in 0..<frameCount {
                 try Task.checkCancellation()
-                let time = CMTime(seconds: duration * Double(step) / 7, preferredTimescale: 600)
+                let fraction = (Double(step) + 0.5) / Double(frameCount)
+                let time = CMTime(seconds: duration * fraction, preferredTimescale: 600)
                 if let result = try? await generator.image(at: time) {
                     guard revision == requestID else { return }
-                    thumbnails.append(UIImage(cgImage: result.image))
+                    thumbnails[step] = UIImage(cgImage: result.image)
                 }
             }
         } catch is CancellationError {
@@ -132,7 +136,7 @@ final class VideoEditor: ObservableObject {
         isPreparingPreview = true
         error = nil
         preview.pause()
-        let output = FileManager.default.temporaryDirectory.appendingPathComponent("Swevo-preview-\(previewID).mp4")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("Kstep-preview-\(previewID).mp4")
         var retained = false
         defer {
             if !retained { try? FileManager.default.removeItem(at: output) }
@@ -183,7 +187,7 @@ final class VideoEditor: ObservableObject {
         progress = 0
         error = nil
         preview.pause()
-        let output = FileManager.default.temporaryDirectory.appendingPathComponent("Swevo-\(UUID().uuidString).\(audioOnly ? "m4a" : "mp4")")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("Kstep-\(UUID().uuidString).\(audioOnly ? "m4a" : "mp4")")
         defer { isExporting = false; exporter = nil }
         var progressTask: Task<Void, Never>?
         defer { progressTask?.cancel() }

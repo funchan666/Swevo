@@ -74,7 +74,7 @@
 		7EAA15000000000000000002 /* Swevo/Features/ShotGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Features/ShotGuideView.swift; sourceTree = SOURCE_ROOT; };
 		86E8C246447DD4C5D9405F57 /* Swevo/Resources/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Swevo/Resources/Info.plist; sourceTree = SOURCE_ROOT; };
 		A09B10000000000000000002 /* Swevo/Resources/LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = Swevo/Resources/LaunchScreen.storyboard; sourceTree = SOURCE_ROOT; };
-		A8792157CB4F27FB949C035F /* Swevo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Swevo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A8792157CB4F27FB949C035F /* Kstep.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Kstep.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ACCE55100000000000000002 /* Swevo/Features/AccountAccessViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Features/AccountAccessViews.swift; sourceTree = SOURCE_ROOT; };
 		B01A9BEACE5275588553E5AD /* Swevo/Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Swevo/Resources/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
 		B2E822DCE2A437F4FCB346A9 /* Swevo/Core/QuotaStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swevo/Core/QuotaStore.swift; sourceTree = SOURCE_ROOT; };
@@ -107,7 +107,7 @@
 		0A3E27B8CA818264D75C8D81 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A8792157CB4F27FB949C035F /* Swevo.app */,
+				A8792157CB4F27FB949C035F /* Kstep.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -155,9 +155,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		34A04005BCAF206EEC990BD9 /* Swevo */ = {
+		34A04005BCAF206EEC990BD9 /* Kstep */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1B672BF3DA427763BF644BE3 /* Build configuration list for PBXNativeTarget "Swevo" */;
+			buildConfigurationList = 1B672BF3DA427763BF644BE3 /* Build configuration list for PBXNativeTarget "Kstep" */;
 			buildPhases = (
 				878A52FC5FF6A57D50B7B870 /* Sources */,
 				E2AA269EB967A8853A258BFA /* Frameworks */,
@@ -167,13 +167,13 @@
 			);
 			dependencies = (
 			);
-			name = Swevo;
+			name = Kstep;
 			packageProductDependencies = (
 				1E2EBF992EE4434C89FA31D5 /* GoogleMobileAds */,
 				0329FE2EF997A30C91906438 /* GoogleUserMessagingPlatform */,
 			);
-			productName = Swevo;
-			productReference = A8792157CB4F27FB949C035F /* Swevo.app */;
+			productName = Kstep;
+			productReference = A8792157CB4F27FB949C035F /* Kstep.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -213,7 +213,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				34A04005BCAF206EEC990BD9 /* Swevo */,
+				34A04005BCAF206EEC990BD9 /* Kstep */,
 			);
 		};
 /* End PBXProject section */
@@ -441,7 +441,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1B672BF3DA427763BF644BE3 /* Build configuration list for PBXNativeTarget "Swevo" */ = {
+		1B672BF3DA427763BF644BE3 /* Build configuration list for PBXNativeTarget "Kstep" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				EDDA600A3F771F810A8065C9 /* Debug */,

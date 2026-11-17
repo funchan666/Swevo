@@ -80,7 +80,7 @@ struct SwevoStartupHost: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { ads.didEnterBackground() }
-            if phase == .active, finished {
+            if phase == .active {
                 ads.didBecomeActive(commerce: commerce, accountAccess: accountAccess)
             }
         }
@@ -95,16 +95,16 @@ struct SwevoStartupView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(.container, edges: .all)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(LocalizedStringKey("Swevo is starting"))
+            .accessibilityLabel(LocalizedStringKey("Kstep is starting"))
             .background(SwevoStyle.background.ignoresSafeArea())
     }
 }
 
 enum SwevoTab: Int, CaseIterable, Hashable {
-    case home, tools, library, me
-    var name: String { ["Videos", "Tools", "Files", "Me"][rawValue] }
-    var artwork: String { ["GlyphFeed", "GlyphEdit", "GlyphFolder", "GlyphSettings"][rawValue] }
-    var identifier: String { "tab.\(name.lowercased())" }
+    case home, tools, cameraMoves, me
+    var name: String { ["Videos", "Tools", "Camera moves", "Me"][rawValue] }
+    var artwork: String { ["GlyphFeed", "GlyphEdit", "GlyphLibrary", "GlyphSettings"][rawValue] }
+    var identifier: String { self == .cameraMoves ? "tab.cameraMoves" : "tab.\(name.lowercased())" }
 }
 
 // Keep a semantic title for VoiceOver and the system's overflow labels.
@@ -143,16 +143,24 @@ private struct SwevoTabDock: View {
             ForEach(SwevoTab.allCases, id: \.self) { tab in
                 let selected = selection == tab
                 Button { selection = tab } label: {
-                    TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.ink : SwevoStyle.paper)
+                    TintedArtwork(name: tab.artwork, tint: selected ? SwevoStyle.accent : SwevoStyle.paper)
                     .frame(width: 24, height: 24)
                     .frame(minWidth: 44, maxWidth: .infinity, minHeight: 48)
                     .background {
                         if selected {
                             let shape = RoundedRectangle(cornerRadius: 17)
-                            shape.fill(SwevoStyle.accent)
+                            shape.fill(SwevoStyle.accent.opacity(0.14))
                                 .matchedGeometryEffect(id: "selected-tab", in: highlight)
                                 .transition(.identity)
                                 .allowsHitTesting(false)
+                        }
+                    }
+                    .overlay(alignment: .bottom) {
+                        if selected {
+                            Capsule().fill(SwevoStyle.accent)
+                                .frame(width: 16, height: 2)
+                                .padding(.bottom, 5)
+                                .allowsHitTesting(false).accessibilityHidden(true)
                         }
                     }
                     .contentShape(Rectangle())
@@ -191,31 +199,25 @@ struct SwevoRootView: View {
     @State private var editing: EditorPresentation?
     @State private var importing = false
     @State private var libraryFilter = "Imports"
-    @State private var showingLearning = false
+    @State private var showingFiles = false
+    @State private var showingPlus = false
     @State private var showingLessons = false
     @State private var returnToLessonEntry = false
     var body: some View {
         GeometryReader { container in
             let nativeBar = usesNativeTabBar(in: container)
-            TabView(selection: $tab) {
-                HomeView(importing: $importing, edit: { editing = EditorPresentation(movie: $0) }, review: {
-                    editing = EditorPresentation(movie: $0, tool: .ranges)
-                }, openLibrary: {
-                    libraryFilter = "Imports"
-                    tab = .library
-                }, openLearning: { showingLearning = true })
-                    .swevoTab(.home, nativeBar: nativeBar)
-                ToolsView().swevoTab(.tools, nativeBar: nativeBar)
-                LibraryView(edit: { editing = EditorPresentation(movie: $0) },
-                            browseVideos: { showingLessons = true },
-                            openEditor: { editing = EditorPresentation(movie: nil) },
-                            filter: $libraryFilter, importing: $importing)
-                    .swevoTab(.library, nativeBar: nativeBar)
-                AccountView().swevoTab(.me, nativeBar: nativeBar)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Give the dock its own layout space so the last row of a tab can scroll above it.
+            VStack(spacing: 0) {
+                TabView(selection: $tab) {
+                    videosTab.swevoTab(.home, nativeBar: nativeBar)
+                    ToolsView(openPlus: openPlus).swevoTab(.tools, nativeBar: nativeBar)
+                    CameraMovesView(openPlus: openPlus).swevoTab(.cameraMoves, nativeBar: nativeBar)
+                    AccountView().swevoTab(.me, nativeBar: nativeBar)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if !nativeBar {
                     SwevoTabDock(selection: $tab)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .disabled(importing)
@@ -223,11 +225,12 @@ struct SwevoRootView: View {
             .tint(SwevoStyle.accent)
             .foregroundStyle(SwevoStyle.paper)
             .sheet(item: $editing) { EditorSheet(initialMovie: $0.movie, initialTool: $0.tool) }
-            .sheet(isPresented: $showingLearning) { LearningView() }
+            .fullScreenCover(isPresented: $showingPlus) { MembershipView(showsRewardOptions: false) }
             .fullScreenCover(isPresented: $showingLessons, onDismiss: {
                 if returnToLessonEntry {
                     returnToLessonEntry = false
                     tab = .home
+                    showingFiles = false
                 }
             }) {
                 DiscoverView(canDismiss: true, returnToLinkInput: {
@@ -238,13 +241,8 @@ struct SwevoRootView: View {
             .overlay(alignment: .top) {
                 if !showingLessons { DownloadCompletionNotice().padding(.top, 8) }
             }
-            .task(id: library.downloadsRequest) {
-                guard library.downloadsRequest != nil else { return }
-                // Full-screen players dismiss first; then move the underlying tab.
-                do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
-                showingLearning = false
-                libraryFilter = "Downloads"
-                tab = .library
+            .onChange(of: library.downloadsRequest) { _, request in
+                if request != nil { openFiles("Downloads") }
             }
             .task(id: api.session?.userId.value) {
                 guard api.session != nil else { return }
@@ -265,6 +263,33 @@ struct SwevoRootView: View {
             .modifier(AccountBusyModifier())
     }
 
+    private var videosTab: some View {
+        NavigationStack {
+            HomeView(importing: $importing,
+                     edit: { editing = EditorPresentation(movie: $0) },
+                     review: { editing = EditorPresentation(movie: $0, tool: .ranges) },
+                     openLibrary: { openFiles("Imports") },
+                     openCameraMoves: { tab = .cameraMoves }, openPlus: openPlus)
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(isPresented: $showingFiles) {
+                    LibraryView(edit: { editing = EditorPresentation(movie: $0) },
+                                browseVideos: { showingLessons = true },
+                                openEditor: { editing = EditorPresentation(movie: nil) },
+                                openPlus: openPlus, filter: $libraryFilter, importing: $importing)
+                        .navigationBarBackButtonHidden(importing)
+                        .toolbar(.hidden, for: .navigationBar)
+                }
+        }
+    }
+
+    private func openFiles(_ filter: String) {
+        libraryFilter = filter
+        tab = .home
+        showingFiles = true
+    }
+
+    private func openPlus() { showingPlus = true }
+
     private func usesNativeTabBar(in container: GeometryProxy) -> Bool {
         if container.size.width < 224 { return true }
         guard #available(iOS 27.1, *) else { return false }
@@ -281,7 +306,7 @@ struct SwevoRootView: View {
 // A network recovery surface, not a second login or consent gate.
 struct ConnectionPanel: View {
     @EnvironmentObject private var api: APIClient
-    var loadingTitle = "Connecting to Swevo…"
+    var loadingTitle = "Connecting to Kstep…"
     @State private var error: String?
     @State private var connecting = false
     @State private var attempt = 0
@@ -289,7 +314,7 @@ struct ConnectionPanel: View {
     var body: some View {
         VStack(spacing: 24) {
             if let error {
-                MessagePanel(title: "Couldn’t connect to Swevo", message: error)
+                MessagePanel(title: "Couldn’t connect to Kstep", message: error)
                 ActionButton(title: "Try again", busy: connecting) { attempt += 1 }
             } else {
                 AccountLoadingIndicator(title: loadingTitle)

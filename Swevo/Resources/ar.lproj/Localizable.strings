@@ -26,6 +26,7 @@
 "Access through %@." = "متاح حتى %@.";
 "Ads are unavailable with your current privacy choices." = "الإعلانات غير متاحة وفق خيارات الخصوصية الحالية.";
 "Advertising privacy" = "خصوصية الإعلانات";
+"Couldn’t open ad privacy settings. Try again." = "تعذّر فتح إعدادات خصوصية الإعلانات. حاول مرة أخرى.";
 "All" = "الكل";
 "All notes can be read offline. Original summaries with links to further reading." = "يمكن قراءة جميع المقالات دون اتصال. ملخصات أصلية مع روابط لمزيد من القراءة.";
 "Also called the French Open, this major is played on red clay. The court's familiar colour comes from a fine layer of crushed brick over its underlying structure." = "تُعرف أيضًا ببطولة فرنسا المفتوحة، وتُقام على أرضية ترابية حمراء. يأتي لونها المميز من طبقة رقيقة من الطوب المسحوق فوق البنية الأساسية للملعب.";
@@ -536,6 +537,9 @@
 "Subscribe" = "اشترك";
 
 "Billed every %@" = "تُحصّل الرسوم كل %@";
+"Subscription plans" = "خطط الاشتراك";
+"Price unavailable" = "السعر غير متاح";
+"Reload plans" = "إعادة تحميل الخطط";
 
 "Apple updated this plan. Review the price and billing period, then continue." = "حدّثت Apple هذه الخطة. راجع السعر وفترة الفوترة ثم تابع.";
 
@@ -554,6 +558,32 @@
 
 "Plan the next shot" = "تخطيط اللقطة التالية";
 "Camera move" = "حركة الكاميرا";
+"Camera moves" = "حركات الكاميرا";
+"Shot examples" = "أمثلة لحركات الكاميرا";
+"Practice records" = "سجل التمارين";
+"Follow at walking pace" = "تتبّع الهدف بسرعة المشي";
+"Reveal from behind an edge" = "اكشف الهدف من خلف حافة";
+"Use layers for parallax" = "استخدم الطبقات لإظهار اختلاف المنظر";
+"How to shoot" = "خطوات التصوير";
+"Try this camera move" = "جرّب حركة الكاميرا هذه";
+"Keep a steady distance from a moving subject." = "حافظ على مسافة ثابتة من الهدف المتحرك.";
+"Rehearse the path" = "تدرّب على المسار";
+"Agree on a short route with your subject and walk it together. Choose a clear path and look where you are going." = "اتفق مع الشخص الذي تصوّره على مسار قصير وامشيا فيه معًا. اختر طريقًا خاليًا من العوائق وانظر أمامك.";
+"Match their rhythm" = "جارِ إيقاعه";
+"Walk at the same speed and hold the subject at the same point in the frame. Leave room in the direction they are moving." = "امشِ بالسرعة نفسها وأبقِ الهدف في الموضع نفسه داخل الكادر. اترك مساحة في اتجاه حركته.";
+"If your distance changes, reset before the next take." = "إذا تغيّرت المسافة، استعد المسافة الأصلية قبل اللقطة التالية.";
+"Start with the subject hidden behind the foreground." = "ابدأ والهدف محجوب خلف عنصر في المقدّمة.";
+"Choose a foreground" = "اختر عنصرًا في المقدّمة";
+"Start with a wall or doorframe close to the lens. Keep the subject visible at your planned end position." = "ابدأ بجدار أو إطار باب قريب من العدسة. تأكّد من ظهور الهدف عند الموضع الذي اخترته لنهاية الحركة.";
+"Move across the edge" = "تحرّك بمحاذاة الحافة";
+"Slide sideways until the subject appears. Stop before you add a second move, so the reveal reads clearly." = "تحرّك جانبًا حتى يظهر الهدف. توقّف قبل أن تضيف حركة ثانية كي يظهر الهدف بوضوح.";
+"Look at the final frame first. Plan the reveal backward from it." = "عاين الكادر النهائي أولًا. ثم خطّط لحركة الكشف بدءًا من تلك النهاية.";
+"Show depth with a close foreground and a distant subject." = "أظهر العمق بعنصر قريب في المقدّمة وهدف بعيد.";
+"Space the layers" = "باعد بين الطبقات";
+"Find a nearby plant or post and place the subject farther away. Check that both are legible in the same frame." = "اختر نبتة أو عمودًا قريبًا وضع الهدف على مسافة أبعد. تأكّد من وضوحهما في الكادر نفسه.";
+"Take a short side step" = "خُذ خطوة جانبية قصيرة";
+"Move parallel to the subject. The foreground will cross the frame faster than the background, giving the shot depth." = "تحرّك بموازاة الهدف. سيعبر عنصر المقدّمة الكادر أسرع من الخلفية، ما يمنح اللقطة إحساسًا بالعمق.";
+"A small, even move is enough when your foreground is close." = "تكفي حركة قصيرة ومنتظمة عندما يكون عنصر المقدّمة قريبًا.";
 "Push in" = "اقتراب";
 "Follow" = "تتبّع";
 "Reveal" = "كشف المشهد";
@@ -602,9 +632,9 @@
 "Couldn’t load lessons" = "تعذّر تحميل الدروس";
 "Search the web with your original input." = "ابحث على الويب باستخدام النص الذي أدخلته.";
 
-"Swevo is starting" = "جارٍ فتح Swevo";
-"Connecting to Swevo…" = "جارٍ الاتصال بـ Swevo…";
-"Couldn’t connect to Swevo" = "تعذّر الاتصال بـ Swevo";
+"Kstep is starting" = "جارٍ فتح Kstep";
+"Connecting to Kstep…" = "جارٍ الاتصال بـ Kstep…";
+"Couldn’t connect to Kstep" = "تعذّر الاتصال بـ Kstep";
 "Edit a video" = "حرّر فيديو";
 "Lesson search" = "البحث عن الدروس";
 "Back to search" = "العودة إلى البحث";
@@ -615,7 +645,7 @@
 "Paste a link or type a code" = "ألصق رابطًا أو اكتب رمزًا";
 "Link help" = "مساعدة الروابط";
 "Find lesson" = "ابحث عن الدرس";
-"Swevo hasn’t connected yet. Try again in a moment." = "لا يزال Swevo يحاول الاتصال. أعد المحاولة بعد لحظات.";
+"Kstep hasn’t connected yet. Try again in a moment." = "لا يزال Kstep يحاول الاتصال. أعد المحاولة بعد لحظات.";
 "2. Paste or type it" = "٢. ألصقه أو اكتبه";
 "If you type the code, match the uppercase and lowercase letters." = "عند كتابة الرمز، التزم بحالة الأحرف الكبيرة والصغيرة.";
 "3. Find the lesson" = "٣. ابحث عن الدرس";
@@ -623,6 +653,7 @@
 "Loading lessons…" = "جارٍ تحميل الدروس…";
 "Searching for lessons…" = "جارٍ البحث عن الدروس…";
 "Daily view limit reached" = "بلغت الحد اليومي للمشاهدة";
+"Continue watching" = "متابعة المشاهدة";
 "Playback unavailable" = "التشغيل غير متاح";
 "Couldn’t load video" = "تعذّر تحميل الفيديو";
 "Save to favorites" = "احفظ في المفضلة";
@@ -630,7 +661,7 @@
 "Tap Save while watching a lesson to add it here." = "اضغط على «حفظ» أثناء مشاهدة الدرس لإضافته هنا.";
 "Tap Download while watching a lesson to save it for offline viewing." = "اضغط على «تنزيل» أثناء مشاهدة الدرس لتتمكن من مشاهدته دون اتصال.";
 "This removes the download from this device." = "سيُزال الفيديو الذي نزّلته من هذا الجهاز.";
-"This deletes the selected copy from your Swevo library." = "سيؤدي هذا إلى حذف النسخة المحددة من مكتبتك في Swevo.";
+"This deletes the selected copy from your Kstep library." = "سيؤدي هذا إلى حذف النسخة المحددة من مكتبتك في Kstep.";
 "Download for offline viewing" = "نزّل للمشاهدة دون اتصال";
 "Ready to watch offline" = "جاهز للمشاهدة دون اتصال";
 "View offline videos" = "عرض الفيديوهات المتاحة دون اتصال";
@@ -650,12 +681,14 @@
 "Crop, rotate or mirror a video." = "اقتصّ الفيديو أو أدره أو اعكسه.";
 "Trim a clip and adjust its framing, speed or audio." = "قصّر مدة المقطع واضبط تأطيره أو سرعته أو صوته.";
 "Change video" = "غيّر الفيديو";
+"Current video" = "الفيديو الحالي";
 "Exports appear in Library under Exports." = "تظهر الملفات التي تصدّرها في قسم «الملفات المصدَّرة» في المكتبة.";
 "Import a video" = "استورد فيديو";
-"Swevo makes a copy for editing." = "ينشئ Swevo نسخة للتحرير.";
+"Your original stays untouched." = "سيبقى الفيديو الأصلي كما هو.";
+"Kstep makes a copy for editing." = "ينشئ Kstep نسخة للتحرير.";
 "Choose from Files" = "اختر من «الملفات»";
 "Trim video" = "قص مدة الفيديو";
-"Swevo crops from the center. Tap Preview changes to check the framing." = "يقتصّ Swevo الصورة من المنتصف. اضغط على «معاينة التغييرات» للتحقق من التأطير.";
+"Kstep crops from the center. Tap Preview changes to check the framing." = "يقتصّ Kstep الصورة من المنتصف. اضغط على «معاينة التغييرات» للتحقق من التأطير.";
 "Video speed" = "سرعة الفيديو";
 "Audio track" = "المسار الصوتي";
 "Export this video’s audio as an M4A file. The video must contain an audio track." = "صدّر صوت هذا الفيديو في ملف M4A. يجب أن يحتوي الفيديو على مسار صوتي.";
@@ -672,13 +705,16 @@
 "Account" = "الحساب";
 "View membership" = "عرض الاشتراك";
 "View Plus plans" = "عرض خطط Plus";
+"View plans" = "عرض الخطط";
 "No ad available" = "لا يتوفر إعلان الآن";
 "Keep this take" = "اعتمد هذه اللقطة";
 "Camera shake" = "اهتزاز الكاميرا";
 "Horizon drift" = "ميلان الأفق";
 "Lost focus" = "فقدان التركيز";
 "Plus benefits" = "مزايا Plus";
-"Swevo Plus" = "Swevo Plus";
+"Kstep Plus" = "Kstep Plus";
+"Video and audio export" = "تصدير الفيديو والصوت";
+"MP4 up to 1080p · M4A" = "MP4 حتى 1080p · M4A";
 "No daily limits" = "بلا حد يومي";
 "Watch and download lessons." = "شاهد الدروس ونزّلها.";
 "Up to 1080p" = "حتى 1080p";
@@ -689,7 +725,7 @@
 "No daily viewing or download limits" = "مشاهدة وتنزيل بلا حد يومي";
 "Save lessons to watch offline." = "احفظ الدروس لمشاهدتها دون اتصال.";
 "Skip opening ads" = "بلا إعلانات عند الفتح";
-"Launch or return to Swevo without an opening ad." = "افتح Swevo أو عد إليه دون ظهور إعلان عند الفتح.";
+"Launch or return to Kstep without an opening ad." = "افتح Kstep أو عد إليه دون ظهور إعلان عند الفتح.";
 "MP4 video export" = "تصدير الفيديو بصيغة MP4";
 "Export your edits at up to 1080p." = "صدّر مقاطعك بعد تعديلها بدقة تصل إلى 1080p.";
 "Save one setup per camera move on this device." = "احفظ إعدادًا واحدًا لكل حركة كاميرا على هذا الجهاز.";
@@ -725,6 +761,7 @@
 "Photos" = "الصور";
 "Find video" = "البحث عن فيديو";
 "Browse videos" = "تصفّح الفيديوهات";
+"Find a shot to try." = "اعثر على لقطة لتجربها.";
 "Video collections" = "مجموعات الفيديو";
 "Couldn’t load collections" = "تعذّر تحميل المجموعات";
 "Connecting to the video service. Try again in a moment." = "جارٍ الاتصال بخدمة الفيديو. حاول مجددًا بعد قليل.";
@@ -739,7 +776,13 @@
 "No matching video" = "لم يتم العثور على فيديو مطابق";
 "No videos available" = "لا توجد فيديوهات متاحة";
 "No more videos are available right now. Try again." = "لا توجد فيديوهات أخرى حاليًا. حاول مجددًا.";
-"Videos you open appear here." = "تظهر هنا الفيديوهات التي تفتحها.";
+"Open a video to find it here later." = "افتح فيديو لتجده هنا لاحقًا.";
+"No recent videos" = "لا توجد فيديوهات حديثة";
+"Choose a video" = "اختر فيديو";
+"Search files" = "البحث في الملفات";
+"Clear search" = "مسح البحث";
+"No matches" = "لا توجد نتائج مطابقة";
+"Try a different name." = "جرّب اسمًا آخر.";
 "Save a video while watching to find it here." = "احفظ الفيديو أثناء مشاهدته لتجده هنا.";
 "Download a video to watch it without a connection." = "نزّل فيديو لمشاهدته دون اتصال.";
 "Mark a range" = "تحديد مقطع";
@@ -753,6 +796,7 @@
 "Remove range" = "إزالة المقطع";
 "Choose a start and end for the range." = "حدّد بداية المقطع ونهايته.";
 "Today’s video allowance" = "رصيد الفيديوهات اليوم";
+"%@ of %@" = "%@ من %@";
 "Browse and practice" = "تصفّح وتدرّب";
 "Paste a video link" = "الصق رابط فيديو";
 "Video link" = "رابط الفيديو";
@@ -766,8 +810,8 @@
 "No video was returned. Check the link and try again later." = "لم يتم العثور على فيديو. تحقّق من الرابط وحاول لاحقًا.";
 "%@ every %@. Renews automatically until canceled." = "%@ كل %@. يتجدد الاشتراك تلقائيًا إلى أن تلغيه.";
 "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected." = "تم تأكيد الشراء. لم يُحدّث وصولك إلى Plus بعد. حاول مجددًا عند الاتصال بالإنترنت.";
-"Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "تعذّر على Swevo ربط عملية الشراء من Apple بحسابك. تواصل مع الدعم لاستعادة الوصول.";
-"This purchase is linked to another Swevo account. Contact support for help restoring access." = "عملية الشراء هذه مرتبطة بحساب Swevo آخر. تواصل مع الدعم لاستعادة الوصول.";
+"Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "تعذّر على Kstep ربط عملية الشراء من Apple بحسابك. تواصل مع الدعم لاستعادة الوصول.";
+"This purchase is linked to another Kstep account. Contact support for help restoring access." = "عملية الشراء هذه مرتبطة بحساب Kstep آخر. تواصل مع الدعم لاستعادة الوصول.";
 "Some purchases couldn’t be restored. Try again." = "تعذّرت استعادة بعض المشتريات. حاول مجددًا.";
 "Couldn’t verify Plus access. Try again when connected." = "تعذّر التحقق من الوصول إلى Plus. حاول مجددًا عند الاتصال بالإنترنت.";
 "No active Plus access on this account." = "لا يوجد وصول نشط إلى Plus على هذا الحساب.";
@@ -790,3 +834,29 @@
 "Couldn’t create the comparison image. Try again." = "تعذّر إنشاء صورة المقارنة. حاول مجددًا.";
 "JPEG stills and comparison images" = "إطارات JPEG وصور المقارنة";
 "Share three frames or one image with the range name and timestamps." = "شارك ثلاثة إطارات أو صورة واحدة تعرض اسم المقطع والتوقيتات.";
+"Edited preview" = "معاينة التعديلات";
+"Looping" = "تشغيل متكرر";
+"Pause video" = "إيقاف الفيديو مؤقتًا";
+"Preparing…" = "جارٍ التحضير…";
+"Set up the shot" = "جهّز اللقطة";
+"Film and log a take" = "صوّر اللقطة وسجّل نتيجتها";
+"Film with your camera app, then log what you noticed." = "صوّر باستخدام تطبيق الكاميرا، ثم دوّن ما لاحظته هنا.";
+"Finish and review" = "إنهاء ومراجعة";
+"Import a video to mark a range, loop it, and compare frames." = "استورد فيديو لتحديد مقطع وتكرار تشغيله ومقارنة إطاراته.";
+"Share three-frame collage" = "مشاركة تجميعة من ثلاثة إطارات";
+"Set start" = "تحديد البداية";
+"Set end" = "تحديد النهاية";
+"Save and loop" = "حفظ وتشغيل متكرر";
+"Show original" = "عرض الفيديو الأصلي";
+"Scrub to a frame, then set the start or end." = "حرّك مؤشر التشغيل إلى الإطار المطلوب، ثم حدّد البداية أو النهاية.";
+"Compare 3 frames" = "مقارنة ٣ إطارات";
+"Continue review" = "متابعة المراجعة";
+"Import video" = "استيراد فيديو";
+"Video unavailable" = "الفيديو غير متاح";
+"All movements" = "كل حركات الكاميرا";
+"Pending import" = "بانتظار استيراد الفيديو";
+"No sessions awaiting video" = "لا توجد جلسات بانتظار فيديو";
+"No matching sessions" = "لا توجد جلسات مطابقة";
+"Clear filters" = "مسح عوامل التصفية";
+"Kstep’s online service is not configured yet. Local editing is available." = "لم تُضبط خدمة Kstep عبر الإنترنت بعد. يمكنك تعديل الفيديوهات على هذا الجهاز.";
+"A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "تعذّر إنشاء اتصال آمن مع Kstep. تحقّق من الشبكة أو اتصال VPN ثم حاول مجددًا. إذا استمرت المشكلة، فقد تكون الخدمة غير متاحة مؤقتًا.";

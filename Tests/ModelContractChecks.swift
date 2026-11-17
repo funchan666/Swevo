@@ -57,6 +57,14 @@ enum ModelContractChecks {
         precondition(!AppOpenTiming.isDue(intervalMinutes: -1, lastShown: nil, now: now))
         precondition(!AppOpenTiming.isDue(intervalMinutes: .infinity, lastShown: nil, now: now))
         precondition(!AppOpenTiming.isDue(intervalMinutes: 1, lastShown: now.addingTimeInterval(60), now: now))
+        // Google demo ads can resolve while the app's release configuration is unavailable.
+        for (format, demoUnit) in [(1, GoogleDemoAds.appOpenUnitID), (5, GoogleDemoAds.rewardedUnitID)] {
+            let placement = GoogleAdPlacement.resolve(for: format, packagedAppID: GoogleDemoAds.appID,
+                                                      testMode: true, release: nil)
+            precondition(placement?.unitID == demoUnit && placement?.isOfficialDemo == true)
+            precondition(GoogleAdPlacement.resolve(for: format, packagedAppID: GoogleDemoAds.appID,
+                                                   testMode: false, release: nil) == nil)
+        }
         // Optional billing configuration must not send an empty verification key.
         for json in [#"{}"#, #"{"iosVerifyShareKey":null}"#, #"{"iosVerifyShareKey":"  "}"#] {
             let billing = try decoder.decode(IOSBillingConfiguration.self, from: Data(json.utf8))

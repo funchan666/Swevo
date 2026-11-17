@@ -26,6 +26,7 @@
 "Access through %@." = "Access through %@.";
 "Ads are unavailable with your current privacy choices." = "Ads are unavailable with your current privacy choices.";
 "Advertising privacy" = "Advertising privacy";
+"Couldn’t open ad privacy settings. Try again." = "Couldn’t open ad privacy settings. Try again.";
 "All" = "All";
 "All notes can be read offline. Original summaries with links to further reading." = "All notes can be read offline. Original summaries with links to further reading.";
 "Also called the French Open, this major is played on red clay. The court's familiar colour comes from a fine layer of crushed brick over its underlying structure." = "Also called the French Open, this major is played on red clay. The court's familiar colour comes from a fine layer of crushed brick over its underlying structure.";
@@ -536,6 +537,9 @@
 "Subscribe" = "Subscribe";
 
 "Billed every %@" = "Billed every %@";
+"Subscription plans" = "Subscription plans";
+"Price unavailable" = "Price unavailable";
+"Reload plans" = "Reload plans";
 
 "Apple updated this plan. Review the price and billing period, then continue." = "Apple updated this plan. Review the price and billing period, then continue.";
 
@@ -554,6 +558,32 @@
 
 "Plan the next shot" = "Plan the next shot";
 "Camera move" = "Camera move";
+"Camera moves" = "Camera moves";
+"Shot examples" = "Shot examples";
+"Practice records" = "Practice records";
+"Follow at walking pace" = "Follow at walking pace";
+"Reveal from behind an edge" = "Reveal from behind an edge";
+"Use layers for parallax" = "Use layers for parallax";
+"How to shoot" = "How to shoot";
+"Try this camera move" = "Try this camera move";
+"Keep a steady distance from a moving subject." = "Keep a steady distance from a moving subject.";
+"Rehearse the path" = "Rehearse the path";
+"Agree on a short route with your subject and walk it together. Choose a clear path and look where you are going." = "Agree on a short route with your subject and walk it together. Choose a clear path and look where you are going.";
+"Match their rhythm" = "Match their rhythm";
+"Walk at the same speed and hold the subject at the same point in the frame. Leave room in the direction they are moving." = "Walk at the same speed and hold the subject at the same point in the frame. Leave room in the direction they are moving.";
+"If your distance changes, reset before the next take." = "If your distance changes, reset before the next take.";
+"Start with the subject hidden behind the foreground." = "Start with the subject hidden behind the foreground.";
+"Choose a foreground" = "Choose a foreground";
+"Start with a wall or doorframe close to the lens. Keep the subject visible at your planned end position." = "Start with a wall or doorframe close to the lens. Keep the subject visible at your planned end position.";
+"Move across the edge" = "Move across the edge";
+"Slide sideways until the subject appears. Stop before you add a second move, so the reveal reads clearly." = "Slide sideways until the subject appears. Stop before you add a second move, so the reveal reads clearly.";
+"Look at the final frame first. Plan the reveal backward from it." = "Look at the final frame first. Plan the reveal backward from it.";
+"Show depth with a close foreground and a distant subject." = "Show depth with a close foreground and a distant subject.";
+"Space the layers" = "Space the layers";
+"Find a nearby plant or post and place the subject farther away. Check that both are legible in the same frame." = "Find a nearby plant or post and place the subject farther away. Check that both are legible in the same frame.";
+"Take a short side step" = "Take a short side step";
+"Move parallel to the subject. The foreground will cross the frame faster than the background, giving the shot depth." = "Move parallel to the subject. The foreground will cross the frame faster than the background, giving the shot depth.";
+"A small, even move is enough when your foreground is close." = "A small, even move is enough when your foreground is close.";
 "Push in" = "Push in";
 "Follow" = "Follow";
 "Reveal" = "Reveal";
@@ -602,9 +632,9 @@
 "Couldn’t load lessons" = "Couldn’t load lessons";
 "Search the web with your original input." = "Search the web with your original input.";
 
-"Swevo is starting" = "Swevo is starting";
-"Connecting to Swevo…" = "Connecting to Swevo…";
-"Couldn’t connect to Swevo" = "Couldn’t connect to Swevo";
+"Kstep is starting" = "Kstep is starting";
+"Connecting to Kstep…" = "Connecting to Kstep…";
+"Couldn’t connect to Kstep" = "Couldn’t connect to Kstep";
 "Edit a video" = "Edit a video";
 "Lesson search" = "Lesson search";
 "Back to search" = "Back to search";
@@ -615,7 +645,7 @@
 "Paste a link or type a code" = "Paste a link or type a code";
 "Link help" = "Link help";
 "Find lesson" = "Find lesson";
-"Swevo hasn’t connected yet. Try again in a moment." = "Swevo hasn’t connected yet. Try again in a moment.";
+"Kstep hasn’t connected yet. Try again in a moment." = "Kstep hasn’t connected yet. Try again in a moment.";
 "2. Paste or type it" = "2. Paste or type it";
 "If you type the code, match the uppercase and lowercase letters." = "If you type the code, match the uppercase and lowercase letters.";
 "3. Find the lesson" = "3. Find the lesson";
@@ -623,6 +653,7 @@
 "Loading lessons…" = "Loading lessons…";
 "Searching for lessons…" = "Searching for lessons…";
 "Daily view limit reached" = "Daily view limit reached";
+"Continue watching" = "Continue watching";
 "Playback unavailable" = "Playback unavailable";
 "Couldn’t load video" = "Couldn’t load video";
 "Save to favorites" = "Save to favorites";
@@ -630,7 +661,7 @@
 "Tap Save while watching a lesson to add it here." = "Tap Save while watching a lesson to add it here.";
 "Tap Download while watching a lesson to save it for offline viewing." = "Tap Download while watching a lesson to save it for offline viewing.";
 "This removes the download from this device." = "This removes the download from this device.";
-"This deletes the selected copy from your Swevo library." = "This deletes the selected copy from your Swevo library.";
+"This deletes the selected copy from your Kstep library." = "This deletes the selected copy from your Kstep library.";
 "Download for offline viewing" = "Download for offline viewing";
 "Ready to watch offline" = "Ready to watch offline";
 "View offline videos" = "View offline videos";
@@ -650,12 +681,14 @@
 "Crop, rotate or mirror a video." = "Crop, rotate or mirror a video.";
 "Trim a clip and adjust its framing, speed or audio." = "Trim a clip and adjust its framing, speed or audio.";
 "Change video" = "Change video";
+"Current video" = "Current video";
 "Exports appear in Library under Exports." = "Exports appear in Library under Exports.";
 "Import a video" = "Import a video";
-"Swevo makes a copy for editing." = "Swevo makes a copy for editing.";
+"Your original stays untouched." = "Your original stays untouched.";
+"Kstep makes a copy for editing." = "Kstep makes a copy for editing.";
 "Choose from Files" = "Choose from Files";
 "Trim video" = "Trim video";
-"Swevo crops from the center. Tap Preview changes to check the framing." = "Swevo crops from the center. Tap Preview changes to check the framing.";
+"Kstep crops from the center. Tap Preview changes to check the framing." = "Kstep crops from the center. Tap Preview changes to check the framing.";
 "Video speed" = "Video speed";
 "Audio track" = "Audio track";
 "Export this video’s audio as an M4A file. The video must contain an audio track." = "Export this video’s audio as an M4A file. The video must contain an audio track.";
@@ -672,13 +705,16 @@
 "Account" = "Account";
 "View membership" = "View membership";
 "View Plus plans" = "View Plus plans";
+"View plans" = "View plans";
 "No ad available" = "No ad available";
 "Keep this take" = "Keep this take";
 "Camera shake" = "Camera shake";
 "Horizon drift" = "Horizon drift";
 "Lost focus" = "Lost focus";
 "Plus benefits" = "Plus benefits";
-"Swevo Plus" = "Swevo Plus";
+"Kstep Plus" = "Kstep Plus";
+"Video and audio export" = "Video and audio export";
+"MP4 up to 1080p · M4A" = "MP4 up to 1080p · M4A";
 "No daily limits" = "No daily limits";
 "Watch and download lessons." = "Watch and download lessons.";
 "Up to 1080p" = "Up to 1080p";
@@ -689,7 +725,7 @@
 "No daily viewing or download limits" = "No daily viewing or download limits";
 "Save lessons to watch offline." = "Save lessons to watch offline.";
 "Skip opening ads" = "Skip opening ads";
-"Launch or return to Swevo without an opening ad." = "Launch or return to Swevo without an opening ad.";
+"Launch or return to Kstep without an opening ad." = "Launch or return to Kstep without an opening ad.";
 "MP4 video export" = "MP4 video export";
 "Export your edits at up to 1080p." = "Export your edits at up to 1080p.";
 "Save one setup per camera move on this device." = "Save one setup per camera move on this device.";
@@ -725,6 +761,7 @@
 "Photos" = "Photos";
 "Find video" = "Find video";
 "Browse videos" = "Browse videos";
+"Find a shot to try." = "Find a shot to try.";
 "Video collections" = "Video collections";
 "Couldn’t load collections" = "Couldn’t load collections";
 "Connecting to the video service. Try again in a moment." = "Connecting to the video service. Try again in a moment.";
@@ -739,7 +776,13 @@
 "No matching video" = "No matching video";
 "No videos available" = "No videos available";
 "No more videos are available right now. Try again." = "No more videos are available right now. Try again.";
-"Videos you open appear here." = "Videos you open appear here.";
+"Open a video to find it here later." = "Open a video to find it here later.";
+"No recent videos" = "No recent videos";
+"Choose a video" = "Choose a video";
+"Search files" = "Search files";
+"Clear search" = "Clear search";
+"No matches" = "No matches";
+"Try a different name." = "Try a different name.";
 "Save a video while watching to find it here." = "Save a video while watching to find it here.";
 "Download a video to watch it without a connection." = "Download a video to watch it without a connection.";
 "Mark a range" = "Mark a range";
@@ -753,6 +796,7 @@
 "Remove range" = "Remove range";
 "Choose a start and end for the range." = "Choose a start and end for the range.";
 "Today’s video allowance" = "Today’s video allowance";
+"%@ of %@" = "%@ of %@";
 "Browse and practice" = "Browse and practice";
 "Paste a video link" = "Paste a video link";
 "Video link" = "Video link";
@@ -766,8 +810,8 @@
 "No video was returned. Check the link and try again later." = "No video was returned. Check the link and try again later.";
 "%@ every %@. Renews automatically until canceled." = "%@ every %@. Renews automatically until canceled.";
 "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected." = "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected.";
-"Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access.";
-"This purchase is linked to another Swevo account. Contact support for help restoring access." = "This purchase is linked to another Swevo account. Contact support for help restoring access.";
+"Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access.";
+"This purchase is linked to another Kstep account. Contact support for help restoring access." = "This purchase is linked to another Kstep account. Contact support for help restoring access.";
 "Some purchases couldn’t be restored. Try again." = "Some purchases couldn’t be restored. Try again.";
 "Couldn’t verify Plus access. Try again when connected." = "Couldn’t verify Plus access. Try again when connected.";
 "No active Plus access on this account." = "No active Plus access on this account.";
@@ -790,3 +834,29 @@
 "Couldn’t create the comparison image. Try again." = "Couldn’t create the comparison image. Try again.";
 "JPEG stills and comparison images" = "JPEG stills and comparison images";
 "Share three frames or one image with the range name and timestamps." = "Share three frames or one image with the range name and timestamps.";
+"Edited preview" = "Edited preview";
+"Looping" = "Looping";
+"Pause video" = "Pause video";
+"Preparing…" = "Preparing…";
+"Set up the shot" = "Set up the shot";
+"Film and log a take" = "Film and log a take";
+"Film with your camera app, then log what you noticed." = "Film with your camera app, then log what you noticed.";
+"Finish and review" = "Finish and review";
+"Import a video to mark a range, loop it, and compare frames." = "Import a video to mark a range, loop it, and compare frames.";
+"Share three-frame collage" = "Share three-frame collage";
+"Set start" = "Set start";
+"Set end" = "Set end";
+"Save and loop" = "Save and loop";
+"Show original" = "Show original";
+"Scrub to a frame, then set the start or end." = "Scrub to a frame, then set the start or end.";
+"Compare 3 frames" = "Compare 3 frames";
+"Continue review" = "Continue review";
+"Import video" = "Import video";
+"Video unavailable" = "Video unavailable";
+"All movements" = "All movements";
+"Pending import" = "Pending import";
+"No sessions awaiting video" = "No sessions awaiting video";
+"No matching sessions" = "No matching sessions";
+"Clear filters" = "Clear filters";
+"Kstep’s online service is not configured yet. Local editing is available." = "Kstep’s online service is not configured yet. Local editing is available.";
+"A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable.";

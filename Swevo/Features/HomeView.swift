@@ -10,13 +10,15 @@ struct HomeView: View {
     let edit: (PracticeRecording) -> Void
     let review: (PracticeRecording) -> Void
     let openLibrary: () -> Void
-    let openLearning: () -> Void
+    let openCameraMoves: () -> Void
+    let openPlus: () -> Void
     @SceneStorage("home.linkDraft") private var link = ""
     @FocusState private var linkFocused: Bool
     @State private var linkError: String?
     @State private var searchRequest: LessonSearch?
     @State private var editLinkAfterSearch = false
     @State private var player: PlayerRoute?
+    @State private var recentVideoID: RecentVideo.ID?
 
     private var videoHistory: [RecentVideo] {
         let local = library.movies.filter { $0.lastOpenedAt != nil && !$0.isAudio }.map(RecentVideo.local)
@@ -29,36 +31,32 @@ struct HomeView: View {
 
     var body: some View {
         let history = videoHistory
-        let latest = history.first
-        return ScenePage(artwork: latest == nil ? "EmptyImports" : nil,
-                         depth: latest == nil ? 172 : 0, artworkOpacity: 0.96) { container in
+        return ScenePage { container in
+            let width = min(680, SwevoStyle.pageContentWidth(in: container))
             let bounds = CGRect(origin: .zero, size: container.size)
-            let wide = latest != nil && !typeSize.isAccessibilitySize
-                && SwevoStyle.pageContentWidth(in: container) >= 600
-                && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+            let compact = typeSize > .xLarge
+            let wide = !compact && width >= 620 && !SwevoStyle.intersectsReservedRegion(bounds, in: container)
+            let columnWidth = wide ? (width - 24) / 2 : width
+            let stacksControls = columnWidth < 280 || compact
             let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24))
-                              : AnyLayout(VStackLayout(alignment: .leading, spacing: 22))
+                              : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
 
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 16) {
+                linkComposer(stacked: width < 280 || compact)
                 layout {
-                    VStack(alignment: .leading, spacing: 12) {
-                        VideoImportActions(onImported: edit, importing: $importing, presentation: .prominent)
-                        linkComposer
+                    VStack(alignment: .leading, spacing: 4) {
+                        VideoImportActions(onImported: edit, importing: $importing,
+                                           presentation: .home(stacked: stacksControls))
+                        Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+                        viewFilesShortcut
+                        cameraMovesEntry(width: columnWidth)
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
 
-                    if let latest {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel(title: "Last opened").accessibilityAddTraits(.isHeader)
-                            recentButton(latest, featured: true)
-                            if case .local(let movie) = latest, movie.rangeMarks?.isEmpty == false {
-                                shortcut("Review saved ranges", glyph: .bookmark) { review(movie) }
-                            }
-                        }.frame(maxWidth: .infinity, alignment: .topLeading)
-                    }
+                    historySection(history, in: container, columnWidth: wide ? columnWidth : nil)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                shortcuts
-                historySection(history.dropFirst(), hasVideos: latest != nil)
+                if !library.history.isEmpty { previousLinks }
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -77,22 +75,30 @@ struct HomeView: View {
         }
     }
 
-    private var linkComposer: some View {
+    private func linkComposer(stacked: Bool) -> some View {
         let hasLink = !link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let stacks = typeSize.isAccessibilitySize
-        let layout = stacks ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                            : AnyLayout(HStackLayout(spacing: 0))
-        return VStack(alignment: .leading, spacing: 8) {
-            layout {
-                HStack(spacing: 8) {
-                    Glyph(symbol: .link, size: 18, tint: SwevoStyle.accent)
-                    TextField("Video URL", text: Binding(get: { link }, set: {
+        let source = WebAddress.media(link)?.host
+        let actionLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                                   : AnyLayout(HStackLayout(spacing: 12))
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                SceneTitle("Video URL", size: 30)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                PlusEntryButton(plain: true, action: openPlus)
+                    .fixedSize(horizontal: !stacked, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    Glyph(symbol: .link, size: 20, tint: SwevoStyle.accent)
+                    TextField("Paste a video link", text: Binding(get: { link }, set: {
                         link = $0
                         linkError = nil
-                    }))
+                    }), prompt: Text("Paste a video link").foregroundStyle(SwevoStyle.secondary))
                     .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                     .focused($linkFocused).submitLabel(.go).onSubmit { openLink(link) }
-                    .font(.capture(.subheadline)).environment(\.layoutDirection, .leftToRight)
+                    .font(.capture(.body)).environment(\.layoutDirection, .leftToRight)
+                    .frame(maxWidth: .infinity, minHeight: 56)
                     .accessibilityLabel("Video link")
                     .accessibilityIdentifier("home.videoLink")
                     if !link.isEmpty {
@@ -103,32 +109,53 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.leading, 14).frame(minHeight: 54)
-                .keyboardInputRegion("home-video-link")
+                .padding(.leading, 16)
+                .padding(.trailing, link.isEmpty ? 16 : 4)
 
-                HStack(spacing: 4) {
-                    Button("Paste", action: pasteLink).font(.capture(.footnote, weight: .semibold))
-                        .foregroundStyle(SwevoStyle.accent)
-                        .fixedSize(horizontal: !stacks, vertical: true).padding(.horizontal, 4)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle()).buttonStyle(PressStyle())
-                        .accessibilityIdentifier("home.pasteLink")
+                Divider().overlay(SwevoStyle.line).padding(.horizontal, 12)
+                    .allowsHitTesting(false).accessibilityHidden(true)
+                actionLayout {
+                    Button(action: pasteLink) {
+                        LocalizedText("Paste").font(.capture(.subheadline, weight: .semibold))
+                            .foregroundStyle(SwevoStyle.paper)
+                            .fixedSize(horizontal: !stacked, vertical: true)
+                            .padding(.horizontal, 8)
+                            .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(PressStyle()).accessibilityIdentifier("home.pasteLink")
+                    if !stacked { Spacer(minLength: 0) }
                     Button { openLink(link) } label: {
-                        Glyph(symbol: .play, size: 16, tint: hasLink ? SwevoStyle.ink : SwevoStyle.secondary)
-                            .frame(width: 36, height: 36)
-                            .background(hasLink ? SwevoStyle.accent : SwevoStyle.raised, in: Circle())
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                        HStack(spacing: 8) {
+                            Glyph(symbol: .play, size: 14, tint: hasLink ? SwevoStyle.ink : SwevoStyle.secondary)
+                            LocalizedText("Open link").font(.capture(.subheadline, weight: .semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .frame(minWidth: 44, maxWidth: stacked ? .infinity : nil, minHeight: 44)
+                        .foregroundStyle(hasLink ? SwevoStyle.ink : SwevoStyle.secondary)
+                        .background(hasLink ? SwevoStyle.accent : SwevoStyle.raised, in: RoundedRectangle(cornerRadius: 12))
+                        .contentShape(Rectangle())
                     }.buttonStyle(PressStyle()).disabled(!hasLink || searchRequest != nil)
                         .accessibilityLabel("Open link")
                         .accessibilityIdentifier("home.openLesson")
-                }.padding(.horizontal, 6).padding(.vertical, 4)
+                }
+                .padding(8)
             }
-            .swevoGlass(cornerRadius: 16)
+            .swevoGlass(cornerRadius: 20)
             .overlay {
-                RoundedRectangle(cornerRadius: 16).strokeBorder(linkFocused ? SwevoStyle.accent : Color.clear)
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(SwevoStyle.accent.opacity(linkFocused ? 1 : 0.34))
                     .allowsHitTesting(false)
             }
-            if let linkError { ErrorNote(message: linkError) }
+            .keyboardInputRegion("home-video-link")
+
+            if let linkError {
+                ErrorNote(message: linkError)
+            } else if let source {
+                Text(verbatim: source).font(.capture(.caption))
+                    .foregroundStyle(SwevoStyle.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                    .environment(\.layoutDirection, .leftToRight)
+            }
         }
     }
 
@@ -150,20 +177,72 @@ struct HomeView: View {
         searchRequest = LessonSearch(query: query)
     }
 
-    @ViewBuilder private func historySection(_ history: ArraySlice<RecentVideo>, hasVideos: Bool) -> some View {
-        if !history.isEmpty || !library.history.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                if !history.isEmpty { SectionLabel(title: "Video history").accessibilityAddTraits(.isHeader) }
-                LazyVStack(alignment: .leading, spacing: 6) {
-                    ForEach(history) { video in
-                        recentButton(video, featured: false)
-                        Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+    @ViewBuilder private func historySection(_ history: [RecentVideo], in container: GeometryProxy, columnWidth: CGFloat?) -> some View {
+        if history.isEmpty {
+            emptyHistory(in: container, columnWidth: columnWidth)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                historyTitle
+                let showsNextCard = history.count > 1 && !typeSize.isAccessibilitySize
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(history) { video in
+                            recentButton(video)
+                                .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in
+                                    showsNextCard ? min(340, width * 0.86) : width
+                                }
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                if !library.history.isEmpty { previousLinks }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $recentVideoID, anchor: .leading)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             }
-        } else if !hasVideos {
-            EmptyStateCopy(message: "Videos you open appear here.")
+        }
+    }
+
+    private var historyTitle: some View {
+        LocalizedText("Recently opened").font(.capture(.headline))
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func emptyHistory(in container: GeometryProxy, columnWidth: CGFloat?) -> some View {
+        let width = columnWidth ?? min(680, SwevoStyle.pageContentWidth(in: container))
+        let artHeight = min(136, max(92, container.size.height * 0.21))
+        let showsArt = typeSize <= .xLarge && width >= 270 && ArtworkCatalog.has("EmptyImports")
+        return VStack(alignment: .leading, spacing: 4) {
+            historyTitle
+            LocalizedText("No recent videos").font(.capture(.subheadline))
+                .foregroundStyle(SwevoStyle.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: showsArt ? width * 0.54 : .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: showsArt ? artHeight : 60, alignment: .leading)
+        .background(alignment: .trailing) {
+            if showsArt {
+                SceneImage(name: "EmptyImports")
+                    .frame(width: min(360, width * 0.72), height: artHeight)
+                    .opacity(0.72)
+                    .mask {
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black.opacity(0.18), location: 0.26),
+                            .init(color: .black, location: 0.60),
+                            .init(color: .black, location: 0.88),
+                            .init(color: .clear, location: 1)
+                        ], startPoint: .leading, endPoint: .trailing)
+                    }
+                    .mask {
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black, location: 0.18),
+                            .init(color: .black, location: 0.76),
+                            .init(color: .clear, location: 1)
+                        ], startPoint: .top, endPoint: .bottom)
+                    }
+            }
         }
     }
 
@@ -193,39 +272,84 @@ struct HomeView: View {
         }
     }
 
-    private var shortcuts: some View {
-        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                                                  : AnyLayout(HStackLayout(spacing: 16))
-        return VStack(alignment: .leading, spacing: 6) {
-            Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
-            layout {
-                shortcut("View files", glyph: .library, action: openLibrary)
-                shortcut("Browse and practice", glyph: .bookmark, action: openLearning)
-            }
-        }
-    }
-
-    private func shortcut(_ title: String, glyph: SwevoGlyph, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Glyph(symbol: glyph, size: 17, tint: SwevoStyle.accent)
-                LocalizedText(title).font(.capture(.subheadline, weight: .semibold))
+    private var viewFilesShortcut: some View {
+        Button {
+            linkFocused = false
+            openLibrary()
+        } label: {
+            HStack(spacing: 10) {
+                Glyph(symbol: .folder, size: 17, tint: SwevoStyle.accent)
+                LocalizedText("View files").font(.capture(.subheadline, weight: .semibold))
+                    .foregroundStyle(SwevoStyle.paper)
                     .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Glyph(symbol: .back, size: 12, tint: SwevoStyle.secondary).rotationEffect(.degrees(180))
             }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
         }.buttonStyle(PressStyle())
+            .accessibilityIdentifier("home.files")
     }
 
-    @ViewBuilder private func recentButton(_ video: RecentVideo, featured: Bool) -> some View {
+    private func cameraMovesEntry(width: CGFloat) -> some View {
+        let artwork = "SceneShot"
+        let showsArtwork = width >= 280 && typeSize <= .xLarge && ArtworkCatalog.has(artwork)
+        let shape = RoundedRectangle(cornerRadius: 16)
+
+        return Button {
+            linkFocused = false
+            openCameraMoves()
+        } label: {
+            HStack(spacing: 12) {
+                SceneTitle("Camera moves", size: 22)
+                    .foregroundStyle(SwevoStyle.paper)
+                    .accessibilityRemoveTraits(.isHeader)
+                    .frame(maxWidth: showsArtwork ? width * 0.54 : .infinity, alignment: .leading)
+                Spacer(minLength: 0)
+                Glyph(symbol: .back, size: 13, tint: SwevoStyle.ink)
+                    .rotationEffect(.degrees(180))
+                    .frame(width: 34, height: 34)
+                    .background(SwevoStyle.accent, in: Circle())
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: showsArtwork ? 96 : 64, alignment: .leading)
+            .background(alignment: .trailing) {
+                if showsArtwork {
+                    SceneImage(name: artwork)
+                        .frame(width: min(340, width * 0.68))
+                        .mask {
+                            LinearGradient(stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black.opacity(0.18), location: 0.30),
+                                .init(color: .black, location: 0.68),
+                                .init(color: .black, location: 1)
+                            ], startPoint: .leading, endPoint: .trailing)
+                        }
+                }
+            }
+            .background(SwevoStyle.surface)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
+            .contentShape(.interaction, shape)
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("home.cameraMoves")
+    }
+
+    @ViewBuilder private func recentButton(_ video: RecentVideo) -> some View {
         switch video {
         case .local(let movie):
             VideoFileButton(url: library.url(for: movie), filename: movie.displayFilename, date: video.date,
-                            featured: featured,
-                            detail: !featured && movie.rangeMarks?.isEmpty == false ? "Saved ranges" : nil) {
+                            presentation: .thumbnail) {
                 edit(movie)
+            }
+            .overlay(alignment: .topTrailing) {
+                if movie.rangeMarks?.isEmpty == false {
+                    IconButton(symbol: .bookmark, label: "Review saved ranges") { review(movie) }
+                        .swevoGlass(cornerRadius: 22).padding(6)
+                }
             }
         case .offline(let download):
             VideoFileButton(url: download.url, filename: download.displayFilename, date: video.date,
-                            featured: featured, fallbackCover: download.clip.coverURL) {
+                            presentation: .thumbnail, fallbackCover: download.clip.coverURL) {
                 guard offline.cached(download.id) != nil else {
                     offline.error = "This download is no longer on this device. Download it again."
                     library.openDownloads()
@@ -235,8 +359,9 @@ struct HomeView: View {
                 player = PlayerRoute(clips: [clip], startID: clip.id)
             }
         case .online(let visit):
-            let entry = VideoFileButton(url: visit.clip.playbackURL, filename: visit.clip.title, date: video.date,
-                                       featured: featured, fallbackCover: visit.clip.coverURL) {
+            let entry = VideoFileButton(url: offline.cached(visit.id)?.url ?? visit.clip.playbackURL,
+                                       filename: visit.clip.title, date: video.date,
+                                       presentation: .thumbnail, fallbackCover: visit.clip.coverURL) {
                 if api.session == nil, offline.cached(visit.id) == nil {
                     library.error = "Connect to replay this video."
                 } else {
@@ -244,16 +369,9 @@ struct HomeView: View {
                     player = PlayerRoute(clips: [clip], startID: clip.id)
                 }
             }
-            let remove = IconButton(symbol: .close, label: "Remove history item") { library.removeWatch(visit) }
-            if featured && !typeSize.isAccessibilitySize {
-                entry.overlay(alignment: .topTrailing) {
-                    remove.swevoGlass(cornerRadius: 22).padding(8)
-                }
-            } else {
-                HStack(spacing: 10) {
-                    entry
-                    remove
-                }
+            entry.overlay(alignment: .topTrailing) {
+                IconButton(symbol: .close, label: "Remove history item") { library.removeWatch(visit) }
+                    .swevoGlass(cornerRadius: 22).padding(6)
             }
         }
     }
@@ -279,47 +397,87 @@ private enum RecentVideo: Identifiable {
     }
 }
 
-struct LearningView: View {
+struct CameraMovesView: View {
     @EnvironmentObject private var api: APIClient
     @EnvironmentObject private var commerce: CommerceStore
-    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var library: LibraryStore
+    @Environment(\.dynamicTypeSize) private var typeSize
+    let openPlus: () -> Void
+    @SceneStorage("shot.movement") private var movement = ShotMovement.pushIn
+    @SceneStorage("shot.duration") private var seconds = 6
+    @SceneStorage("shot.focusLock") private var lockedFocus = false
     @State private var error: String?
     @State private var channel: ChannelRoute?
     @State private var browsing = false
     @State private var channels: [LandingInfo] = []
     @State private var channelRetry = 0
-    @State private var showingGuide = false
-    @State private var showingPlanner = false
+    @State private var exampleID: ShotNote.ID?
+    @State private var destination: Destination?
+
+    private enum Destination: Identifiable {
+        case notes, planner, records
+        case example(String)
+
+        var id: String {
+            switch self {
+            case .notes: "notes"
+            case .planner: "planner"
+            case .records: "records"
+            case .example(let id): "example-\(id)"
+            }
+        }
+    }
 
     var body: some View {
         let request = ChannelRequest(links: commerce.release?.lcList?["us"] ?? [], attempt: channelRetry)
-        ScenePage(artwork: "SceneLessons", depth: 96, artworkOpacity: 0.58) { _ in
-            VStack(alignment: .leading, spacing: 20) {
-                connection
-                VStack(spacing: 0) {
-                    LearningLink(symbol: .play, title: "Browse videos") {
-                        browsing = true
-                    }
-                    Divider().overlay(SwevoStyle.line)
-                    LearningLink(symbol: .edit, title: "Shot planner") {
-                        showingPlanner = true
-                    }
-                    Divider().overlay(SwevoStyle.line)
-                    LearningLink(symbol: .folder, title: "Shot field notes") {
-                        showingGuide = true
-                    }
-                    .accessibilityIdentifier("shotGuide.open")
+        ScenePage(artwork: "SceneLessons", depth: 222, openingGap: 0) { height in
+            VStack(alignment: .leading, spacing: 12) {
+                PlusEntryButton(action: openPlus)
+                Spacer(minLength: 16)
+                SceneTitle("Camera moves", size: 38)
+            }
+            .frame(minHeight: height, alignment: .top)
+        } content: { container in
+            let width = min(680, SwevoStyle.pageContentWidth(in: container))
+            let bounds = CGRect(origin: .zero, size: container.size)
+            let hasReservedRegion = SwevoStyle.intersectsReservedRegion(bounds, in: container)
+            let wide = typeSize <= .xLarge && width >= 600 && !hasReservedRegion
+            let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 24))
+                              : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+
+            VStack(alignment: .leading, spacing: 22) {
+                browseEntry(width: width, allowsArtwork: !hasReservedRegion)
+                examples(stacked: width < 280 || typeSize.isAccessibilitySize || hasReservedRegion)
+                layout {
+                    plannerEntry
+                    recordsEntry
                 }
+                connection
                 referenceFootage
             }
         }
-            .sceneDismiss { dismiss() }
             .sheet(item: $channel) { ChannelView(route: $0) }
             .fullScreenCover(isPresented: $browsing) {
                 DiscoverView(canDismiss: true)
             }
-            .sheet(isPresented: $showingPlanner) { ShotPlannerView() }
-            .sheet(isPresented: $showingGuide) { ShotGuideView() }
+            .sheet(item: $destination) { destination in
+                switch destination {
+                case .notes:
+                    ShotGuideView()
+                case .example(let id):
+                    ShotGuideView(initialNoteID: id)
+                case .planner:
+                    ShotPlannerView(movement: $movement, seconds: $seconds, lockedFocus: $lockedFocus)
+                case .records:
+                    ShotPracticeView(initialMovement: movement, initialSeconds: seconds,
+                                     initialFocusLock: lockedFocus, startInHistory: true)
+                }
+            }
+            .onChange(of: library.downloadsRequest) { _, request in
+                guard request != nil else { return }
+                browsing = false
+                channel = nil
+            }
             .task(id: request) {
                 guard !Task.isCancelled else { return }
                 channels = []
@@ -332,6 +490,163 @@ struct LearningView: View {
                     if !Task.isCancelled { self.error = error.localizedDescription }
                 }
             }
+    }
+
+    private func browseEntry(width: CGFloat, allowsArtwork: Bool) -> some View {
+        let artwork = "SceneEdit"
+        let showsArtwork = allowsArtwork && width >= 300 && typeSize <= .xLarge && ArtworkCatalog.has(artwork)
+        let shape = RoundedRectangle(cornerRadius: 16)
+
+        return Button { browsing = true } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    SceneTitle("Browse videos", size: 25)
+                        .foregroundStyle(SwevoStyle.paper)
+                        .accessibilityRemoveTraits(.isHeader)
+                    LocalizedText("Find a shot to try.").font(.capture(.footnote))
+                        .foregroundStyle(SwevoStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: showsArtwork ? width * 0.55 : .infinity, alignment: .leading)
+                Spacer(minLength: 0)
+                Glyph(symbol: .play, size: 19, tint: SwevoStyle.ink)
+                    .frame(width: 44, height: 44)
+                    .background(SwevoStyle.accent, in: Circle())
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: showsArtwork ? 110 : 72, alignment: .leading)
+            .background(alignment: .trailing) {
+                if showsArtwork {
+                    SceneImage(name: artwork)
+                        .frame(width: min(480, width * 0.74))
+                        .mask {
+                            LinearGradient(stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black.opacity(0.16), location: 0.50),
+                                .init(color: .black, location: 0.80)
+                            ], startPoint: .leading, endPoint: .trailing)
+                        }
+                }
+            }
+            .background(SwevoStyle.surface)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(SwevoStyle.line).allowsHitTesting(false) }
+            .contentShape(.interaction, shape)
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("cameraMoves.browseVideos")
+    }
+
+    private func examples(stacked: Bool) -> some View {
+        let moves = ShotNote.all.filter { $0.category == "Movement" }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            LocalizedText("Shot examples").font(.capture(.headline))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if stacked {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(moves, content: exampleButton)
+                }
+            } else {
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(moves) { note in
+                            exampleButton(note)
+                                .containerRelativeFrame(.horizontal) { width, _ in min(206, width * 0.43) }
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $exampleID, anchor: .leading)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            }
+            LearningLink(symbol: .folder, title: "Shot field notes") { destination = .notes }
+                .accessibilityIdentifier("shotGuide.open")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func exampleButton(_ note: ShotNote) -> some View {
+        Button { destination = .example(note.id) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Color.clear.aspectRatio(16.0 / 10, contentMode: .fit)
+                    .background { SceneImage(name: note.artwork) }
+                    .clipShape(.rect(cornerRadius: 8))
+                LocalizedText(note.shortTitle).font(.capture(.subheadline, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("cameraMoves.example.\(note.id)")
+    }
+
+    private var plannerEntry: some View {
+        let movementLabel = LocalizedText(movement.label).foregroundStyle(SwevoStyle.accent)
+        let duration = Text(verbatim: "\(seconds) s").monospacedDigit()
+            .environment(\.layoutDirection, .leftToRight)
+        let focus = LocalizedText(lockedFocus ? "Focus locked" : "Autofocus")
+            .fixedSize(horizontal: false, vertical: true)
+
+        return Button { destination = .planner } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    SceneTitle("Shot planner", size: 24)
+                        .accessibilityRemoveTraits(.isHeader)
+                    Spacer(minLength: 0)
+                    Glyph(symbol: .back, size: 13, tint: SwevoStyle.accent)
+                        .rotationEffect(.degrees(180))
+                }
+                Divider().overlay(SwevoStyle.line).accessibilityHidden(true)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 13) {
+                        movementLabel
+                        duration
+                        focus
+                    }.fixedSize(horizontal: true, vertical: false)
+                    VStack(alignment: .leading, spacing: 5) {
+                        movementLabel
+                        duration
+                        focus
+                    }
+                }
+                .font(.capture(.footnote, weight: .semibold))
+                .foregroundStyle(SwevoStyle.secondary)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .swevoGlass(cornerRadius: 17)
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 17))
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("cameraMoves.planner")
+    }
+
+    private var recordsEntry: some View {
+        Button { destination = .records } label: {
+            HStack(spacing: 12) {
+                Glyph(symbol: .library, size: 20, tint: SwevoStyle.accent)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 4) {
+                    LocalizedText("Practice records").font(.capture(.headline))
+                        .fixedSize(horizontal: false, vertical: true)
+                    LocalizedText("Review your footage").font(.capture(.footnote))
+                        .foregroundStyle(SwevoStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Glyph(symbol: .back, size: 13, tint: SwevoStyle.secondary)
+                    .rotationEffect(.degrees(180))
+            }
+            .padding(.vertical, 10)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityIdentifier("cameraMoves.records")
     }
 
     @ViewBuilder private var connection: some View {
@@ -395,9 +710,9 @@ private struct LearningLink: View {
 
 private struct ShotPlannerView: View {
     @Environment(\.dismiss) private var dismiss
-    @SceneStorage("shot.movement") private var movement = ShotMovement.pushIn
-    @SceneStorage("shot.duration") private var seconds = 6
-    @SceneStorage("shot.focusLock") private var lockedFocus = false
+    @Binding var movement: ShotMovement
+    @Binding var seconds: Int
+    @Binding var lockedFocus: Bool
     @State private var showingJournal = false
     @State private var showingPresets = false
 
@@ -419,7 +734,7 @@ private struct ShotPlannerView: View {
                         focusControl
                     }
                 }
-                ActionButton(title: "Shot log", primary: false) { showingJournal = true }
+                ActionButton(title: "Practice") { showingJournal = true }
                     .accessibilityIdentifier("practice.openJournal")
                 LearningLink(symbol: .bookmark, title: "Shot presets") { showingPresets = true }
                     .accessibilityIdentifier("practice.openPresets")
@@ -538,7 +853,7 @@ private struct ShotPresetsView: View {
             }
         }
         .sceneDismiss { dismiss() }
-        .sheet(isPresented: $showingMembership) { MembershipView() }
+        .fullScreenCover(isPresented: $showingMembership) { MembershipView() }
     }
 
     private func currentShot(saved: Preset?) -> some View {
@@ -630,18 +945,15 @@ struct ChannelView: View {
     private var emptyChannel: Bool { items.isEmpty && !loading && !hasMore && error == nil }
 
     var body: some View {
-        ScenePage(artwork: emptyChannel ? "EmptyLessons" : nil, depth: emptyChannel ? 134 : 64,
-                  openingGap: 0, artworkOpacity: 0.45) { _ in
+        ScenePage(artwork: nil, depth: 64, openingGap: 0) { _ in
             Text(verbatim: route.title).font(.capture(.headline))
                 .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
                 .padding(.trailing, 50)
-        } content: { _ in
-            LazyVStack(spacing: 14) {
+        } content: { container in
+            LazyVStack(alignment: .leading, spacing: 14) {
                 if emptyChannel {
-                    VStack(alignment: .leading, spacing: 14) {
-                        EmptyStateCopy(message: "This channel has no available videos.")
-                        EmptyStateAction(title: "Back", symbol: .back) { dismiss() }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    EmptyStateScene(artwork: "EmptyLessons", title: "No videos available", container: container)
+                    EmptyStateAction(title: "Back", symbol: .back, primary: true) { dismiss() }
                 }
                 ForEach(items, id: \.stableID) { item in
                     Button { open(item) } label: {

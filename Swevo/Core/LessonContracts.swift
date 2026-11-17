@@ -308,14 +308,15 @@ enum GoogleDemoAds {
     }
 }
 
-extension ReleaseConfiguration {
+extension GoogleAdPlacement {
     // Production: App ID comes from getV2 and must agree with the SDK's packaged identity.
     // Never substitute a sample ad unit for a missing or invalid server value.
-    // Test mode: the build configuration selects Google's official demo units instead.
-    func googlePlacement(for type: Int, packagedAppID: String?, testMode: Bool) -> GoogleAdPlacement? {
+    // Demo placements are bundled and can resolve before getV2 returns.
+    static func resolve(for type: Int, packagedAppID: String?, testMode: Bool,
+                        release: ReleaseConfiguration?) -> GoogleAdPlacement? {
         if testMode { return GoogleDemoAds.placement(for: type, packagedAppID: packagedAppID) }
         guard packagedAppID != GoogleDemoAds.appID else { return nil }
-        let matches = (adList ?? []).filter {
+        let matches = (release?.adList ?? []).filter {
             $0.adType == type && $0.advertiser?.lowercased() == "google"
         }
         guard matches.count == 1, let unit = matches.first,
@@ -374,7 +375,7 @@ enum SwevoError: LocalizedError {
     case configuration, invalidResponse, unauthorized, service(String), storage, unsupportedMedia
     var errorDescription: String? {
         switch self {
-        case .configuration: return "Swevo’s online service is not configured yet. Local editing is available."
+        case .configuration: return "Kstep’s online service is not configured yet. Local editing is available."
         case .invalidResponse: return "The service returned an unreadable response. Please try again."
         case .unauthorized: return "Your session has expired. Please sign in again."
         case .service(let message): return message
@@ -387,7 +388,7 @@ enum SwevoError: LocalizedError {
         switch error.code {
         case .secureConnectionFailed, .serverCertificateHasBadDate, .serverCertificateUntrusted,
              .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid:
-            return SwevoError.service("A secure connection to Swevo could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable.")
+            return SwevoError.service("A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable.")
         case .notConnectedToInternet, .networkConnectionLost:
             return SwevoError.service("Your internet connection was interrupted. Reconnect and try again.")
         case .timedOut:

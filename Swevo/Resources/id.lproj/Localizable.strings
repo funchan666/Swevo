@@ -26,6 +26,7 @@
 "Access through %@." = "Akses hingga %@.";
 "Ads are unavailable with your current privacy choices." = "Iklan tidak tersedia dengan pilihan privasi saat ini.";
 "Advertising privacy" = "Privasi iklan";
+"Couldn’t open ad privacy settings. Try again." = "Pengaturan privasi iklan tidak dapat dibuka. Coba lagi.";
 "All" = "Semua";
 "All notes can be read offline. Original summaries with links to further reading." = "Semua artikel tersedia offline. Ringkasan orisinal dengan tautan bacaan lanjutan.";
 "Also called the French Open, this major is played on red clay. The court's familiar colour comes from a fine layer of crushed brick over its underlying structure." = "Juga disebut French Open, turnamen ini dimainkan di tanah liat merah. Warna khas lapangan berasal dari lapisan tipis bata yang dihancurkan di atas struktur dasarnya.";
@@ -536,6 +537,9 @@
 "Subscribe" = "Berlangganan";
 
 "Billed every %@" = "Ditagih setiap %@";
+"Subscription plans" = "Paket langganan";
+"Price unavailable" = "Harga tidak tersedia";
+"Reload plans" = "Muat ulang paket";
 
 "Apple updated this plan. Review the price and billing period, then continue." = "Apple memperbarui paket ini. Periksa harga dan periode penagihan, lalu lanjutkan.";
 
@@ -554,6 +558,32 @@
 
 "Plan the next shot" = "Rencanakan pengambilan berikutnya";
 "Camera move" = "Gerakan kamera";
+"Camera moves" = "Gerakan kamera";
+"Shot examples" = "Contoh gerakan kamera";
+"Practice records" = "Riwayat latihan";
+"Follow at walking pace" = "Ikuti subjek dengan kecepatan berjalan";
+"Reveal from behind an edge" = "Ungkap subjek dari balik tepi";
+"Use layers for parallax" = "Gunakan lapisan untuk efek paralaks";
+"How to shoot" = "Cara merekam";
+"Try this camera move" = "Coba gerakan kamera ini";
+"Keep a steady distance from a moving subject." = "Jaga jarak yang tetap dari subjek yang bergerak.";
+"Rehearse the path" = "Latih rutenya";
+"Agree on a short route with your subject and walk it together. Choose a clear path and look where you are going." = "Sepakati rute pendek dengan subjek, lalu lalui bersama dengan berjalan kaki. Pilih jalur yang bebas halangan dan lihat ke arah Anda berjalan.";
+"Match their rhythm" = "Ikuti ritmenya";
+"Walk at the same speed and hold the subject at the same point in the frame. Leave room in the direction they are moving." = "Berjalanlah dengan kecepatan yang sama dan pertahankan posisi subjek di dalam bingkai. Sisakan ruang ke arah gerak subjek.";
+"If your distance changes, reset before the next take." = "Jika jaraknya berubah, kembali ke jarak awal sebelum merekam lagi.";
+"Start with the subject hidden behind the foreground." = "Mulailah dengan subjek tersembunyi di balik objek di latar depan.";
+"Choose a foreground" = "Pilih objek latar depan";
+"Start with a wall or doorframe close to the lens. Keep the subject visible at your planned end position." = "Mulailah dengan dinding atau kusen pintu dekat lensa. Pastikan subjek terlihat dari posisi akhir yang Anda rencanakan.";
+"Move across the edge" = "Bergeser melewati tepi";
+"Slide sideways until the subject appears. Stop before you add a second move, so the reveal reads clearly." = "Bergeserlah ke samping sampai subjek terlihat. Berhenti sebelum menambahkan gerakan kedua agar kemunculan subjek terlihat jelas.";
+"Look at the final frame first. Plan the reveal backward from it." = "Periksa bingkai akhir terlebih dahulu. Gunakan bingkai itu untuk menentukan posisi awal dan jalur gerakan.";
+"Show depth with a close foreground and a distant subject." = "Ciptakan kesan kedalaman dengan objek latar depan yang dekat dan subjek yang lebih jauh.";
+"Space the layers" = "Beri jarak antarlapisan";
+"Find a nearby plant or post and place the subject farther away. Check that both are legible in the same frame." = "Cari tanaman atau tiang di dekat kamera dan tempatkan subjek lebih jauh. Pastikan keduanya terlihat jelas dalam satu bingkai.";
+"Take a short side step" = "Ambil satu langkah kecil ke samping";
+"Move parallel to the subject. The foreground will cross the frame faster than the background, giving the shot depth." = "Bergeraklah sejajar dengan subjek. Objek latar depan akan melintasi bingkai lebih cepat daripada latar belakang, sehingga rekaman terasa lebih dalam.";
+"A small, even move is enough when your foreground is close." = "Jika objek latar depan cukup dekat, gerakan pendek dengan laju yang stabil sudah cukup.";
 "Push in" = "Mendekat";
 "Follow" = "Mengikuti";
 "Reveal" = "Pengungkapan";
@@ -602,9 +632,9 @@
 "Couldn’t load lessons" = "Pelajaran tidak dapat dimuat";
 "Search the web with your original input." = "Cari di web dengan teks yang sama.";
 
-"Swevo is starting" = "Membuka Swevo";
-"Connecting to Swevo…" = "Menghubungkan ke Swevo…";
-"Couldn’t connect to Swevo" = "Tidak dapat terhubung ke Swevo";
+"Kstep is starting" = "Membuka Kstep";
+"Connecting to Kstep…" = "Menghubungkan ke Kstep…";
+"Couldn’t connect to Kstep" = "Tidak dapat terhubung ke Kstep";
 "Edit a video" = "Edit video";
 "Lesson search" = "Pencarian pelajaran";
 "Back to search" = "Kembali ke pencarian";
@@ -615,7 +645,7 @@
 "Paste a link or type a code" = "Tempel tautan atau ketik kode";
 "Link help" = "Bantuan tautan";
 "Find lesson" = "Cari pelajaran";
-"Swevo hasn’t connected yet. Try again in a moment." = "Swevo belum terhubung. Coba lagi sebentar.";
+"Kstep hasn’t connected yet. Try again in a moment." = "Kstep belum terhubung. Coba lagi sebentar.";
 "2. Paste or type it" = "2. Tempel atau ketik";
 "If you type the code, match the uppercase and lowercase letters." = "Jika mengetik kode, ikuti huruf besar dan kecilnya.";
 "3. Find the lesson" = "3. Cari pelajaran";
@@ -623,6 +653,7 @@
 "Loading lessons…" = "Memuat pelajaran…";
 "Searching for lessons…" = "Mencari pelajaran…";
 "Daily view limit reached" = "Batas tontonan harian tercapai";
+"Continue watching" = "Lanjut menonton";
 "Playback unavailable" = "Video tidak dapat diputar";
 "Couldn’t load video" = "Video tidak dapat dimuat";
 "Save to favorites" = "Simpan ke favorit";
@@ -630,7 +661,7 @@
 "Tap Save while watching a lesson to add it here." = "Ketuk Simpan saat menonton pelajaran untuk menambahkannya ke sini.";
 "Tap Download while watching a lesson to save it for offline viewing." = "Ketuk Unduh saat menonton pelajaran agar bisa menontonnya secara offline.";
 "This removes the download from this device." = "Unduhan akan dihapus dari perangkat ini.";
-"This deletes the selected copy from your Swevo library." = "Salinan yang dipilih akan dihapus dari koleksi Swevo kamu.";
+"This deletes the selected copy from your Kstep library." = "Salinan yang dipilih akan dihapus dari koleksi Kstep kamu.";
 "Download for offline viewing" = "Unduh untuk ditonton secara offline";
 "Ready to watch offline" = "Siap ditonton secara offline";
 "View offline videos" = "Lihat video offline";
@@ -650,12 +681,14 @@
 "Crop, rotate or mirror a video." = "Pangkas bingkai, putar, atau balik video.";
 "Trim a clip and adjust its framing, speed or audio." = "Potong durasi klip, lalu atur bingkai, kecepatan, atau audionya.";
 "Change video" = "Ganti video";
+"Current video" = "Video saat ini";
 "Exports appear in Library under Exports." = "Hasil ekspor muncul di bagian Hasil ekspor dalam Koleksi.";
 "Import a video" = "Impor video";
-"Swevo makes a copy for editing." = "Swevo membuat salinan untuk diedit.";
+"Your original stays untouched." = "Video asli Anda tetap utuh.";
+"Kstep makes a copy for editing." = "Kstep membuat salinan untuk diedit.";
 "Choose from Files" = "Pilih dari File";
 "Trim video" = "Potong durasi video";
-"Swevo crops from the center. Tap Preview changes to check the framing." = "Swevo memangkas bingkai dari tengah. Ketuk Pratinjau perubahan untuk memeriksa bingkai.";
+"Kstep crops from the center. Tap Preview changes to check the framing." = "Kstep memangkas bingkai dari tengah. Ketuk Pratinjau perubahan untuk memeriksa bingkai.";
 "Video speed" = "Kecepatan video";
 "Audio track" = "Trek audio";
 "Export this video’s audio as an M4A file. The video must contain an audio track." = "Ekspor suara video ini sebagai file M4A. Video harus memiliki trek audio.";
@@ -672,13 +705,16 @@
 "Account" = "Akun";
 "View membership" = "Lihat langganan";
 "View Plus plans" = "Lihat paket Plus";
+"View plans" = "Lihat paket";
 "No ad available" = "Tidak ada iklan yang tersedia";
 "Keep this take" = "Simpan pengambilan ini";
 "Camera shake" = "Kamera bergoyang";
 "Horizon drift" = "Horizon miring";
 "Lost focus" = "Fokus hilang";
 "Plus benefits" = "Keuntungan Plus";
-"Swevo Plus" = "Swevo Plus";
+"Kstep Plus" = "Kstep Plus";
+"Video and audio export" = "Ekspor video dan audio";
+"MP4 up to 1080p · M4A" = "MP4 hingga 1080p · M4A";
 "No daily limits" = "Tanpa batas harian";
 "Watch and download lessons." = "Tonton dan unduh tutorial.";
 "Up to 1080p" = "Hingga 1080p";
@@ -689,7 +725,7 @@
 "No daily viewing or download limits" = "Tonton dan unduh tanpa batas harian";
 "Save lessons to watch offline." = "Simpan tutorial untuk ditonton secara offline.";
 "Skip opening ads" = "Tanpa iklan pembuka";
-"Launch or return to Swevo without an opening ad." = "Buka atau kembali ke Swevo tanpa iklan pembuka.";
+"Launch or return to Kstep without an opening ad." = "Buka atau kembali ke Kstep tanpa iklan pembuka.";
 "MP4 video export" = "Ekspor video MP4";
 "Export your edits at up to 1080p." = "Ekspor video hasil edit dengan resolusi hingga 1080p.";
 "Save one setup per camera move on this device." = "Simpan satu pengaturan untuk setiap gerakan kamera di perangkat ini.";
@@ -725,6 +761,7 @@
 "Photos" = "Foto";
 "Find video" = "Cari video";
 "Browse videos" = "Jelajahi video";
+"Find a shot to try." = "Temukan cara pengambilan gambar yang ingin dicoba.";
 "Video collections" = "Koleksi video";
 "Couldn’t load collections" = "Koleksi tidak dapat dimuat";
 "Connecting to the video service. Try again in a moment." = "Sedang menghubungkan ke layanan video. Coba lagi sebentar.";
@@ -739,7 +776,13 @@
 "No matching video" = "Video tidak ditemukan";
 "No videos available" = "Tidak ada video yang tersedia";
 "No more videos are available right now. Try again." = "Tidak ada video lain untuk saat ini. Coba lagi.";
-"Videos you open appear here." = "Video yang Anda buka akan muncul di sini.";
+"Open a video to find it here later." = "Buka video untuk menemukannya lagi di sini.";
+"No recent videos" = "Belum ada video terbaru";
+"Choose a video" = "Pilih video";
+"Search files" = "Cari file";
+"Clear search" = "Hapus kata pencarian";
+"No matches" = "Tidak ada hasil";
+"Try a different name." = "Coba nama lain.";
 "Save a video while watching to find it here." = "Simpan video saat menonton agar muncul di sini.";
 "Download a video to watch it without a connection." = "Unduh video untuk menonton tanpa koneksi.";
 "Mark a range" = "Tandai bagian video";
@@ -753,6 +796,7 @@
 "Remove range" = "Hapus bagian";
 "Choose a start and end for the range." = "Tentukan awal dan akhir bagian video.";
 "Today’s video allowance" = "Kuota video hari ini";
+"%@ of %@" = "%@ dari %@";
 "Browse and practice" = "Jelajahi dan berlatih";
 "Paste a video link" = "Tempel tautan video";
 "Video link" = "Tautan video";
@@ -766,8 +810,8 @@
 "No video was returned. Check the link and try again later." = "Tidak ada video yang ditemukan. Periksa tautannya dan coba lagi nanti.";
 "%@ every %@. Renews automatically until canceled." = "%@ setiap %@. Langganan diperpanjang otomatis hingga dibatalkan.";
 "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected." = "Pembelian dikonfirmasi. Akses Plus belum diperbarui. Coba lagi saat terhubung ke internet.";
-"Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "Swevo tidak dapat mencocokkan pembelian Apple ini dengan akun Anda. Hubungi dukungan untuk memulihkan akses.";
-"This purchase is linked to another Swevo account. Contact support for help restoring access." = "Pembelian ini tertaut ke akun Swevo lain. Hubungi dukungan untuk memulihkan akses.";
+"Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "Kstep tidak dapat mencocokkan pembelian Apple ini dengan akun Anda. Hubungi dukungan untuk memulihkan akses.";
+"This purchase is linked to another Kstep account. Contact support for help restoring access." = "Pembelian ini tertaut ke akun Kstep lain. Hubungi dukungan untuk memulihkan akses.";
 "Some purchases couldn’t be restored. Try again." = "Sebagian pembelian tidak dapat dipulihkan. Coba lagi.";
 "Couldn’t verify Plus access. Try again when connected." = "Akses Plus tidak dapat diverifikasi. Coba lagi saat terhubung ke internet.";
 "No active Plus access on this account." = "Akun ini tidak memiliki akses Plus yang aktif.";
@@ -790,3 +834,29 @@
 "Couldn’t create the comparison image. Try again." = "Gambar perbandingan tidak dapat dibuat. Coba lagi.";
 "JPEG stills and comparison images" = "Gambar JPEG dan perbandingan bingkai";
 "Share three frames or one image with the range name and timestamps." = "Bagikan tiga bingkai atau satu gambar dengan nama bagian dan penanda waktu.";
+"Edited preview" = "Pratinjau edit";
+"Looping" = "Diputar berulang";
+"Pause video" = "Jeda video";
+"Preparing…" = "Menyiapkan…";
+"Set up the shot" = "Siapkan pengambilan gambar";
+"Film and log a take" = "Rekam dan catat hasilnya";
+"Film with your camera app, then log what you noticed." = "Rekam dengan aplikasi kamera, lalu catat hasil pengamatanmu di sini.";
+"Finish and review" = "Selesaikan dan tinjau";
+"Import a video to mark a range, loop it, and compare frames." = "Impor video untuk menandai bagian, memutarnya berulang, dan membandingkan bingkai.";
+"Share three-frame collage" = "Bagikan kolase tiga bingkai";
+"Set start" = "Tentukan awal";
+"Set end" = "Tentukan akhir";
+"Save and loop" = "Simpan dan putar berulang";
+"Show original" = "Tampilkan video asli";
+"Scrub to a frame, then set the start or end." = "Geser penunjuk waktu ke bingkai yang diinginkan, lalu tentukan awal atau akhir.";
+"Compare 3 frames" = "Bandingkan 3 bingkai";
+"Continue review" = "Lanjutkan peninjauan";
+"Import video" = "Impor video";
+"Video unavailable" = "Video tidak tersedia";
+"All movements" = "Semua gerakan";
+"Pending import" = "Menunggu impor";
+"No sessions awaiting video" = "Tidak ada sesi yang menunggu video";
+"No matching sessions" = "Tidak ada sesi yang cocok";
+"Clear filters" = "Hapus filter";
+"Kstep’s online service is not configured yet. Local editing is available." = "Layanan online Kstep belum dikonfigurasi. Kamu bisa mengedit video di perangkat ini.";
+"A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "Koneksi aman ke Kstep tidak dapat dibuat. Periksa jaringan atau VPN, lalu coba lagi. Jika masalah berlanjut, layanan mungkin tidak tersedia untuk sementara.";

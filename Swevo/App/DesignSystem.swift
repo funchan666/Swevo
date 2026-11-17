@@ -163,13 +163,13 @@ extension ScenePage where Opening == EmptyView {
 // MARK: - Glyphs
 
 enum SwevoGlyph: String, CaseIterable {
-    case home, feed, edit, library, link, search, bookmark, download
+    case feed, edit, library, link, search, bookmark, download
     case play, pause, close, back, sound, mute, folder, settings
     var assetName: String { "Glyph" + rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
     // Shown only while the original glyph artwork is missing, so every control stays usable.
     var fallbackTitle: String {
         switch self {
-        case .home: "Home"; case .feed: "Watch"; case .edit: "Edit"; case .library: "Library"
+        case .feed: "Watch"; case .edit: "Edit"; case .library: "Library"
         case .link: "Link"; case .search: "Search"; case .bookmark: "Saved"; case .download: "Download"
         case .play: "Play"; case .pause: "Pause"; case .close: "Close"; case .back: "Back"
         case .sound: "Sound"; case .mute: "Mute"; case .folder: "Folder"; case .settings: "Me"
@@ -275,42 +275,93 @@ struct ActionButton: View {
     }
 }
 
-struct EmptyStateCopy: View {
+struct EmptyStateScene: View {
+    let artwork: String
     var title: String? = nil
-    let message: String
+    var message: String? = nil
+    let container: GeometryProxy
+    var columnWidth: CGFloat? = nil
+    var maxArtworkHeight: CGFloat = 300
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            if let title { SceneTitle(title, size: 30) }
-            LocalizedText(message)
-                .font(.capture(.body))
-                .foregroundStyle(SwevoStyle.secondary)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
+        let artworkWidth = columnWidth ?? min(container.size.width, 680)
+        let artworkHeight = ArtworkCatalog.has(artwork)
+            ? min(artworkWidth * 0.64, min(maxArtworkHeight, container.size.height * 0.36))
+            : 0
+
+        VStack(alignment: .leading, spacing: 6) {
+            if let title {
+                SceneTitle(title, size: 32)
+                    .foregroundStyle(SwevoStyle.paper)
+            }
+            if let message {
+                LocalizedText(message)
+                    .font(.capture(.body))
+                    .foregroundStyle(SwevoStyle.secondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .frame(maxWidth: 440, alignment: .leading)
+        .frame(maxWidth: 400, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, artworkHeight * 0.86)
+        .background(alignment: .top) {
+            SceneImage(name: artwork)
+                .frame(width: columnWidth == nil ? artworkWidth : nil, height: artworkHeight)
+                .mask {
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.14),
+                        .init(color: .black, location: 0.54),
+                        .init(color: .black.opacity(0.08), location: 0.85),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                }
+                .mask {
+                    if columnWidth != nil || artworkWidth < container.size.width {
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black, location: 0.08),
+                            .init(color: .black, location: 0.92),
+                            .init(color: .clear, location: 1)
+                        ], startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.black
+                    }
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }
 
 struct EmptyStateAction: View {
     let title: String
     let symbol: SwevoGlyph
+    var primary = false
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Glyph(symbol: symbol, size: 18, tint: SwevoStyle.accent)
+                Glyph(symbol: symbol, size: 18, tint: primary ? SwevoStyle.ink : SwevoStyle.accent)
                 LocalizedText(title)
                     .font(.capture(.subheadline, weight: .semibold))
+                    .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .frame(minHeight: 48)
-            .foregroundStyle(SwevoStyle.paper)
-            .swevoGlass()
-            .contentShape(.interaction, RoundedRectangle(cornerRadius: 16))
+            .foregroundStyle(primary ? SwevoStyle.ink : SwevoStyle.paper)
+            .background {
+                if primary {
+                    CaptureSurface(tone: .accent)
+                } else {
+                    Color.clear.swevoGlass(cornerRadius: 12)
+                }
+            }
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(PressStyle())
     }
@@ -335,6 +386,7 @@ struct ErrorNote: View {
     let message: String
     var body: some View {
         LocalizedText(message).font(.capture(.subheadline)).foregroundStyle(SwevoStyle.danger)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
             .accessibilityLabel(Text(verbatim: L10n.display("Error: \(message)", language: AppLanguage.from(locale))))
     }
@@ -463,8 +515,11 @@ struct SheetHeading: View {
     let title: String
     var close: () -> Void
     var body: some View {
-        HStack {
-            LocalizedText(title).font(.capture(.headline)).lineLimit(2)
+        HStack(alignment: .top, spacing: 12) {
+            LocalizedText(title).font(.capture(.headline))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
             Spacer()
             IconButton(symbol: .close, label: "Close", action: close)
         }.pageHorizontalMargins().padding(.top, 8)

@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "34A04005BCAF206EEC990BD9"
-               BuildableName = "Swevo.app"
-               BlueprintName = "Swevo"
+               BuildableName = "Kstep.app"
+               BlueprintName = "Kstep"
                ReferencedContainer = "container:Swevo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -44,8 +44,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "34A04005BCAF206EEC990BD9"
-            BuildableName = "Swevo.app"
-            BlueprintName = "Swevo"
+            BuildableName = "Kstep.app"
+            BlueprintName = "Kstep"
             ReferencedContainer = "container:Swevo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "34A04005BCAF206EEC990BD9"
-            BuildableName = "Swevo.app"
-            BlueprintName = "Swevo"
+            BuildableName = "Kstep.app"
+            BlueprintName = "Kstep"
             ReferencedContainer = "container:Swevo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

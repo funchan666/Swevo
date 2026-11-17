@@ -61,17 +61,21 @@ final class LibraryStore: ObservableObject {
         save(next)
     }
 
-    func addRange(_ range: ClosedRange<Double>, name: String, to movieID: UUID) throws {
+    @discardableResult
+    func addRange(_ range: ClosedRange<Double>, name: String, to movieID: UUID) throws -> VideoRangeMark {
         guard let index = movies.firstIndex(where: { $0.id == movieID && !$0.isAudio }) else { throw SwevoError.storage }
         let title = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
         let mark = VideoRangeMark(id: UUID(), name: title, start: range.lowerBound, end: range.upperBound)
         guard mark.timeRange != nil else { throw SwevoError.service("Choose a start and end for the range.") }
         var next = snapshot
         var ranges = next.movies[index].rangeMarks ?? []
-        guard !ranges.contains(where: { $0.start == mark.start && $0.end == mark.end && $0.name == mark.name }) else { return }
+        if let existing = ranges.first(where: { $0.start == mark.start && $0.end == mark.end && $0.name == mark.name }) {
+            return existing
+        }
         ranges.insert(mark, at: 0)
         next.movies[index].rangeMarks = ranges
         try persist(next)
+        return mark
     }
 
     func removeRange(_ mark: VideoRangeMark, from movieID: UUID) throws {
@@ -105,7 +109,7 @@ final class LibraryStore: ObservableObject {
             }
             name = name.trimmingCharacters(in: CharacterSet(charactersIn: ". "))
             while name.utf8.count > 160 { name.removeLast() }
-            if name.isEmpty { name = "Swevo video" }
+            if name.isEmpty { name = "Kstep video" }
             let destination = directory.appendingPathComponent(name).appendingPathExtension(source.pathExtension)
             do {
                 try Task.checkCancellation()

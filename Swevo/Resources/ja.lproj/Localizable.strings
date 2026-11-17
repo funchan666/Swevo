@@ -26,6 +26,7 @@
 "Access through %@." = "%@まで利用できます。";
 "Ads are unavailable with your current privacy choices." = "現在のプライバシー設定では広告を利用できません。";
 "Advertising privacy" = "広告のプライバシー";
+"Couldn’t open ad privacy settings. Try again." = "広告のプライバシー設定を開けませんでした。もう一度お試しください。";
 "All" = "すべて";
 "All notes can be read offline. Original summaries with links to further reading." = "すべての記事をオフラインで読めます。独自の要約と参考リンクを掲載しています。";
 "Also called the French Open, this major is played on red clay. The court's familiar colour comes from a fine layer of crushed brick over its underlying structure." = "全仏オープンとも呼ばれ、赤土のクレーコートで開催されます。あの色は、コートの土台に敷いた細かく砕いたレンガの薄い層によるものです。";
@@ -536,6 +537,9 @@
 "Subscribe" = "登録する";
 
 "Billed every %@" = "%@ごとに請求";
+"Subscription plans" = "サブスクリプションプラン";
+"Price unavailable" = "価格を取得できません";
+"Reload plans" = "プランを再読み込み";
 
 "Apple updated this plan. Review the price and billing period, then continue." = "Appleのプラン情報が更新されました。価格と請求周期を確認してから続けてください。";
 
@@ -554,6 +558,32 @@
 
 "Plan the next shot" = "次のカットを計画";
 "Camera move" = "カメラの動き";
+"Camera moves" = "カメラワーク";
+"Shot examples" = "カメラワークの例";
+"Practice records" = "練習記録";
+"Follow at walking pace" = "歩く速さで被写体を追う";
+"Reveal from behind an edge" = "手前の縁から被写体を見せる";
+"Use layers for parallax" = "前景と背景で視差を生かす";
+"How to shoot" = "撮影手順";
+"Try this camera move" = "このカメラワークを試す";
+"Keep a steady distance from a moving subject." = "動く被写体との距離を一定に保ちます。";
+"Rehearse the path" = "撮影ルートを下見する";
+"Agree on a short route with your subject and walk it together. Choose a clear path and look where you are going." = "被写体と短いルートを決め、一緒に歩いて確認します。障害物のない道を選び、進行方向を見ながら歩きます。";
+"Match their rhythm" = "被写体の歩調に合わせる";
+"Walk at the same speed and hold the subject at the same point in the frame. Leave room in the direction they are moving." = "同じ速さで歩き、画面内で被写体の位置を一定に保ちます。被写体が進む方向に余白を残します。";
+"If your distance changes, reset before the next take." = "距離が変わったら、次のテイクの前に元の距離に戻します。";
+"Start with the subject hidden behind the foreground." = "最初は手前の物で被写体を隠します。";
+"Choose a foreground" = "手前に置く物を選ぶ";
+"Start with a wall or doorframe close to the lens. Keep the subject visible at your planned end position." = "壁やドアの枠をレンズの近くに入れて始めます。動きの終点で被写体が見えることを確認します。";
+"Move across the edge" = "縁を越えるように横へ動く";
+"Slide sideways until the subject appears. Stop before you add a second move, so the reveal reads clearly." = "被写体が見えるまで横へ移動します。被写体が現れたことが伝わるよう、そのまま次の動きに移らず止まります。";
+"Look at the final frame first. Plan the reveal backward from it." = "まず最後の構図を確認します。そこから逆算して被写体を見せる動きを決めます。";
+"Show depth with a close foreground and a distant subject." = "レンズの近くに物を置き、離れた位置に被写体を置くと奥行きが出ます。";
+"Space the layers" = "前景と被写体に距離をつける";
+"Find a nearby plant or post and place the subject farther away. Check that both are legible in the same frame." = "レンズの近くに植物や柱を入れ、被写体を離れた場所に置きます。同じ画面で両方を見分けられるか確認します。";
+"Take a short side step" = "横に小さく一歩動く";
+"Move parallel to the subject. The foreground will cross the frame faster than the background, giving the shot depth." = "被写体と平行に動きます。手前の物が背景より速く画面を横切ることで、映像に奥行きが出ます。";
+"A small, even move is enough when your foreground is close." = "手前の物が近ければ、小さく一定の速さで動くだけで十分です。";
 "Push in" = "寄り";
 "Follow" = "追従";
 "Reveal" = "リビール";
@@ -602,9 +632,9 @@
 "Couldn’t load lessons" = "レッスンを読み込めませんでした";
 "Search the web with your original input." = "入力した内容でウェブを検索できます。";
 
-"Swevo is starting" = "Swevoを起動中";
-"Connecting to Swevo…" = "Swevoに接続中…";
-"Couldn’t connect to Swevo" = "Swevoに接続できませんでした";
+"Kstep is starting" = "Kstepを起動中";
+"Connecting to Kstep…" = "Kstepに接続中…";
+"Couldn’t connect to Kstep" = "Kstepに接続できませんでした";
 "Edit a video" = "動画を編集";
 "Lesson search" = "レッスン検索";
 "Back to search" = "検索に戻る";
@@ -615,7 +645,7 @@
 "Paste a link or type a code" = "リンクを貼り付けるかコードを入力";
 "Link help" = "リンクの使い方";
 "Find lesson" = "レッスンを検索";
-"Swevo hasn’t connected yet. Try again in a moment." = "Swevoは接続中です。少し待ってからもう一度試してください。";
+"Kstep hasn’t connected yet. Try again in a moment." = "Kstepは接続中です。少し待ってからもう一度試してください。";
 "2. Paste or type it" = "2. 貼り付けるか入力";
 "If you type the code, match the uppercase and lowercase letters." = "コードを入力するときは、大文字と小文字を区別してください。";
 "3. Find the lesson" = "3. レッスンを検索";
@@ -623,6 +653,7 @@
 "Loading lessons…" = "レッスンを読み込み中…";
 "Searching for lessons…" = "レッスンを検索中…";
 "Daily view limit reached" = "本日の視聴上限に達しました";
+"Continue watching" = "視聴を続ける";
 "Playback unavailable" = "再生できません";
 "Couldn’t load video" = "動画を読み込めませんでした";
 "Save to favorites" = "お気に入りに保存";
@@ -630,7 +661,7 @@
 "Tap Save while watching a lesson to add it here." = "レッスンの視聴中に「保存」をタップすると、ここに追加されます。";
 "Tap Download while watching a lesson to save it for offline viewing." = "レッスンの視聴中に「ダウンロード」をタップすると、オフラインで見られます。";
 "This removes the download from this device." = "この端末からダウンロードした動画を削除します。";
-"This deletes the selected copy from your Swevo library." = "選んだコピーをSwevoのライブラリから削除します。";
+"This deletes the selected copy from your Kstep library." = "選んだコピーをKstepのライブラリから削除します。";
 "Download for offline viewing" = "オフライン視聴用にダウンロード";
 "Ready to watch offline" = "オフラインで視聴できます";
 "View offline videos" = "オフライン動画を見る";
@@ -650,12 +681,14 @@
 "Crop, rotate or mirror a video." = "動画の切り抜き、回転、反転ができます。";
 "Trim a clip and adjust its framing, speed or audio." = "クリップの長さ、構図、再生速度、音声を調整できます。";
 "Change video" = "動画を変更";
+"Current video" = "編集中の動画";
 "Exports appear in Library under Exports." = "書き出したファイルはライブラリの「書き出し済み」に表示されます。";
 "Import a video" = "動画を読み込む";
-"Swevo makes a copy for editing." = "Swevoは編集用のコピーを作成します。";
+"Your original stays untouched." = "元の動画は変更されません。";
+"Kstep makes a copy for editing." = "Kstepは編集用のコピーを作成します。";
 "Choose from Files" = "ファイルから選ぶ";
 "Trim video" = "動画のトリミング";
-"Swevo crops from the center. Tap Preview changes to check the framing." = "Swevoは中央を基準に切り抜きます。「変更をプレビュー」で構図を確認できます。";
+"Kstep crops from the center. Tap Preview changes to check the framing." = "Kstepは中央を基準に切り抜きます。「変更をプレビュー」で構図を確認できます。";
 "Video speed" = "動画の再生速度";
 "Audio track" = "音声トラック";
 "Export this video’s audio as an M4A file. The video must contain an audio track." = "この動画の音声をM4Aファイルに書き出します。書き出しには音声トラックが必要です。";
@@ -672,13 +705,16 @@
 "Account" = "アカウント";
 "View membership" = "メンバーシップを確認";
 "View Plus plans" = "Plusのプランを見る";
+"View plans" = "プランを見る";
 "No ad available" = "視聴できる広告がありません";
 "Keep this take" = "このテイクを採用";
 "Camera shake" = "手ぶれ";
 "Horizon drift" = "水平のずれ";
 "Lost focus" = "ピントのずれ";
 "Plus benefits" = "Plusの特典";
-"Swevo Plus" = "Swevo Plus";
+"Kstep Plus" = "Kstep Plus";
+"Video and audio export" = "動画と音声の書き出し";
+"MP4 up to 1080p · M4A" = "MP4（最大1080p）・M4A";
 "No daily limits" = "1日の上限なし";
 "Watch and download lessons." = "レッスンを視聴・保存できます。";
 "Up to 1080p" = "最大1080p";
@@ -689,7 +725,7 @@
 "No daily viewing or download limits" = "視聴とダウンロードの1日の上限なし";
 "Save lessons to watch offline." = "レッスンを保存してオフラインで視聴できます。";
 "Skip opening ads" = "起動時の広告なし";
-"Launch or return to Swevo without an opening ad." = "Swevoを開くときや戻ったときに、起動時の広告が表示されません。";
+"Launch or return to Kstep without an opening ad." = "Kstepを開くときや戻ったときに、起動時の広告が表示されません。";
 "MP4 video export" = "MP4動画の書き出し";
 "Export your edits at up to 1080p." = "編集した動画を最大1080pで書き出せます。";
 "Save one setup per camera move on this device." = "カメラの動きごとに、設定を1つこの端末に保存できます。";
@@ -725,6 +761,7 @@
 "Photos" = "写真";
 "Find video" = "動画を探す";
 "Browse videos" = "動画を見る";
+"Find a shot to try." = "次に試したい撮り方を見つける。";
 "Video collections" = "動画コレクション";
 "Couldn’t load collections" = "コレクションを読み込めませんでした";
 "Connecting to the video service. Try again in a moment." = "動画サービスに接続中です。少し待ってからお試しください。";
@@ -739,7 +776,13 @@
 "No matching video" = "該当する動画が見つかりません";
 "No videos available" = "視聴できる動画がありません";
 "No more videos are available right now. Try again." = "現在これ以上動画はありません。もう一度お試しください。";
-"Videos you open appear here." = "開いた動画はここに表示されます。";
+"Open a video to find it here later." = "動画を開くと、あとでここから見返せます。";
+"No recent videos" = "最近開いた動画はありません";
+"Choose a video" = "動画を選ぶ";
+"Search files" = "ファイルを検索";
+"Clear search" = "検索語を消去";
+"No matches" = "一致する項目がありません";
+"Try a different name." = "別の名前で検索してください。";
 "Save a video while watching to find it here." = "視聴中に保存した動画はここに表示されます。";
 "Download a video to watch it without a connection." = "動画をダウンロードするとオフラインで視聴できます。";
 "Mark a range" = "区間をマーク";
@@ -753,6 +796,7 @@
 "Remove range" = "区間を削除";
 "Choose a start and end for the range." = "区間の開始と終了を設定してください。";
 "Today’s video allowance" = "今日の動画利用枠";
+"%@ of %@" = "%2$@件中%1$@件";
 "Browse and practice" = "動画と撮影練習";
 "Paste a video link" = "動画のリンクを貼り付け";
 "Video link" = "動画のリンク";
@@ -766,8 +810,8 @@
 "No video was returned. Check the link and try again later." = "動画が見つかりませんでした。リンクを確認し、時間をおいてお試しください。";
 "%@ every %@. Renews automatically until canceled." = "%2$@ごとに%1$@。解約するまで自動更新されます。";
 "Purchase confirmed. Plus access hasn’t updated yet. Try again when connected." = "購入は確認されました。Plusの利用状況はまだ反映されていません。接続後にもう一度お試しください。";
-"Swevo couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "このAppleでの購入をSwevoアカウントと照合できませんでした。利用を再開するにはサポートにお問い合わせください。";
-"This purchase is linked to another Swevo account. Contact support for help restoring access." = "この購入は別のSwevoアカウントに紐づいています。利用を再開するにはサポートにお問い合わせください。";
+"Kstep couldn’t match this Apple purchase to your account. Contact support for help restoring access." = "このAppleでの購入をKstepアカウントと照合できませんでした。利用を再開するにはサポートにお問い合わせください。";
+"This purchase is linked to another Kstep account. Contact support for help restoring access." = "この購入は別のKstepアカウントに紐づいています。利用を再開するにはサポートにお問い合わせください。";
 "Some purchases couldn’t be restored. Try again." = "一部の購入を復元できませんでした。もう一度お試しください。";
 "Couldn’t verify Plus access. Try again when connected." = "Plusの利用状況を確認できませんでした。接続後にもう一度お試しください。";
 "No active Plus access on this account." = "このアカウントには有効なPlus利用権がありません。";
@@ -790,3 +834,29 @@
 "Couldn’t create the comparison image. Try again." = "比較画像を作成できませんでした。もう一度お試しください。";
 "JPEG stills and comparison images" = "JPEG画像と比較画像";
 "Share three frames or one image with the range name and timestamps." = "3枚のフレーム、または区間名と各フレームの時刻を載せた比較画像を共有できます。";
+"Edited preview" = "編集後のプレビュー";
+"Looping" = "ループ再生中";
+"Pause video" = "動画を一時停止";
+"Preparing…" = "準備中…";
+"Set up the shot" = "撮影を準備";
+"Film and log a take" = "撮影して記録";
+"Film with your camera app, then log what you noticed." = "カメラアプリで撮影し、気づいたことをここに記録します。";
+"Finish and review" = "終了して見返す";
+"Import a video to mark a range, loop it, and compare frames." = "動画を読み込み、区間を指定してループ再生やフレーム比較を行います。";
+"Share three-frame collage" = "3フレームのコラージュを共有";
+"Set start" = "開始を設定";
+"Set end" = "終了を設定";
+"Save and loop" = "保存してループ再生";
+"Show original" = "元の動画を表示";
+"Scrub to a frame, then set the start or end." = "再生位置を合わせて、開始点または終了点を設定します。";
+"Compare 3 frames" = "3フレームを比較";
+"Continue review" = "レビューを続ける";
+"Import video" = "動画を読み込む";
+"Video unavailable" = "動画を開けません";
+"All movements" = "すべての動き";
+"Pending import" = "動画未追加";
+"No sessions awaiting video" = "動画の追加が必要なセッションはありません";
+"No matching sessions" = "条件に一致するセッションはありません";
+"Clear filters" = "絞り込みを解除";
+"Kstep’s online service is not configured yet. Local editing is available." = "Kstep のオンラインサービスはまだ設定されていません。端末内の動画は編集できます。";
+"A secure connection to Kstep could not be established. Check your network or VPN, then try again. If it continues, the service may be temporarily unavailable." = "Kstep に安全に接続できませんでした。ネットワークや VPN を確認して、もう一度お試しください。問題が続く場合は、サービスが一時的に利用できない可能性があります。";
