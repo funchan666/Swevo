@@ -868,3 +868,7 @@
 "Usage details" = "Detalhes de uso";
 "Hide details" = "Ocultar detalhes";
 "%@ left · %@ total today" = "Restantes %@ · Total de hoje %@";
+"Check price" = "Consultar preço";
+"Billed monthly" = "Cobrança mensal";
+"Billed yearly" = "Cobrança anual";
+"%@ every %@" = "%@ a cada %@";

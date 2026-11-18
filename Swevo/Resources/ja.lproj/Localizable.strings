@@ -868,3 +868,7 @@
 "Usage details" = "利用状況の詳細";
 "Hide details" = "詳細を閉じる";
 "%@ left · %@ total today" = "残り%@回・本日の合計%@回";
+"Check price" = "価格を確認";
+"Billed monthly" = "月ごとのお支払い";
+"Billed yearly" = "年ごとのお支払い";
+"%@ every %@" = "%2$@ごとに%1$@";

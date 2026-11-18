@@ -868,3 +868,7 @@
 "Usage details" = "사용량 상세";
 "Hide details" = "상세 숨기기";
 "%@ left · %@ total today" = "남은 횟수 %@회 · 오늘 총 %@회";
+"Check price" = "가격 확인";
+"Billed monthly" = "매월 청구";
+"Billed yearly" = "매년 청구";
+"%@ every %@" = "%2$@마다 %1$@";

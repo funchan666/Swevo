@@ -11,7 +11,7 @@ Open `Swevo.xcodeproj` and select the shared `kstep` scheme for the `Kstep` app 
 - The API host is `o4r8xgd.kstep.site`. The app name and `getV2.name` use `Kstep` from `SWEVO_RELEASE_NAME`.
 - The Bundle ID, guest login `source`, and business `packageName` use `site.kstepchan.motion`.
 - AdMob uses the packaged App ID in `Config/Swevo.xcconfig`. App-open and rewarded units come from `getV2.adList` as Google types `1` and `5` respectively. Each placement's `config.appId` must match the packaged App ID.
-- Membership uses `site.kstepchan.motion.plus.monthly` and `site.kstepchan.motion.plus.yearly`. Create these exact IDs under Kstep's subscription group in App Store Connect, with one-month and one-year durations, and map them as `rightsName` in the backend. The existing backend `usdPrice` values are `999` and `9999`. StoreKit supplies the displayed prices and billing periods.
+- Membership uses `site.kstepchan.motion.plus.monthly` and `site.kstepchan.motion.plus.yearly`. Create these exact IDs under Kstep's subscription group in App Store Connect, with one-month and one-year durations, and map them as `rightsName` in the backend. The existing backend `usdPrice` values are `999` and `9999`. The paywall labels its initial USD reference prices and replaces them with StoreKit's local prices and billing periods before purchase.
 - The app links to the [Kstep website](https://www.kstep.site), [privacy policy](https://www.kstep.site/privacy.html), and [terms](https://www.kstep.site/terms.html).
 
 For playback verification, enter a supported video link or short code from the configured API. Check the full-screen player and the entry under Recently opened. Use an authorized test account when verifying Apple purchases and restores.
@@ -31,8 +31,6 @@ The receipt routing fields come from `getV2.ios` and are saved with each order. 
 On 2026-11-18, the website, privacy policy and terms returned HTTP 200. A read-only `getV2` request using an existing user ID returned business code `0` and omitted `adList` and `ios`. Confirm the release registration and ad placements for Kstep with a current production visitor. Product creation, backend order mapping, receipt routing and purchase/restore still need account and service verification.
 
 In AdMob **Privacy & messaging**, publish the messages for the regions you serve and assign them to the iOS app matching the packaged AdMob App ID. Use Kstep's privacy policy URL in the AdMob message and verify consent and placements with Google test devices. [Google iOS UMP setup](https://developers.google.com/admob/ios/privacy)
-
-See the [App Review source audit](docs/AppReview/2026-11-16/review-report.md) for cross-device purchase restoration, guest account deletion, and submission evidence.
 
 ## Verification
 

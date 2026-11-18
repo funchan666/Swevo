@@ -868,3 +868,7 @@
 "Usage details" = "تفاصيل الاستخدام";
 "Hide details" = "إخفاء التفاصيل";
 "%@ left · %@ total today" = "المتبقي %@ · الإجمالي اليومي %@";
+"Check price" = "التحقق من السعر";
+"Billed monthly" = "الفوترة شهرية";
+"Billed yearly" = "الفوترة سنوية";
+"%@ every %@" = "%@ كل %@";

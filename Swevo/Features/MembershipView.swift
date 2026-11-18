@@ -305,6 +305,11 @@ struct MembershipView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 planPicker(paired: paired && configuredPlans.count == 2)
+                if plans.count < configuredPlans.count {
+                    LocalizedText("USD reference prices. Apple confirms your local price before payment.")
+                        .font(.capture(.caption)).foregroundStyle(SwevoStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !loadingCatalog, plans.count < configuredPlans.count {
                     LocalizedText(commerce.plansError ?? "This plan isn’t available from Apple yet. Please try again later.")
                         .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
@@ -326,7 +331,7 @@ struct MembershipView: View {
         if commerce.preparingPurchase { return "Preparing purchase…" }
         if commerce.busy { return "Checking purchases…" }
         if loadingCatalog { return "Loading plans…" }
-        return selectedPlan == nil ? "Reload plans" : "Subscribe"
+        return selectedPlan == nil ? "Check price" : "Subscribe"
     }
 
     private func planPicker(paired: Bool) -> some View {
@@ -360,13 +365,17 @@ struct MembershipView: View {
             if let product {
                 planPrice(commerce.price(product), selected: selected)
             } else {
-                LocalizedText(loadingCatalog ? "Checking with Apple…" : "Price unavailable")
-                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                planPrice("USD \(entry.displayPriceUSD)", selected: false)
             }
         }
         let period = Group {
-            if let product { planPeriod(commerce.period(product, locale: locale)) }
+            if let product {
+                planPeriod(commerce.period(product, locale: locale))
+            } else {
+                LocalizedText(entry.period == .month ? "Billed monthly" : "Billed yearly")
+                    .font(.capture(.footnote)).foregroundStyle(SwevoStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         let stacked = VStack(alignment: .leading, spacing: 4) {
             name
@@ -461,11 +470,17 @@ struct MembershipView: View {
             if canShowOffer { subscribe() } else { reloadPlans() }
         } label: {
             HStack(spacing: 16) {
-                LocalizedText(purchaseButtonTitle)
-                    .font(.capture(.title3, weight: .bold))
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    LocalizedText(purchaseButtonTitle)
+                        .font(.capture(.title3, weight: .bold))
+                    if canShowOffer, let selectedPlan {
+                        LocalizedText("%@ every %@", commerce.price(selectedPlan), commerce.period(selectedPlan, locale: locale))
+                            .font(.capture(.footnote, weight: .medium))
+                    }
+                }
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Group {
                     if purchasing || loadingCatalog {
                         ProgressView().tint(tint)

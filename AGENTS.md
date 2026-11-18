@@ -7,7 +7,7 @@ Kstep 是以视频文件为核心的工具，提供播放、编辑和导出，�
 - 业务沿用 Clipo。「视频」页的链接输入框通过 `search-check` 进入可纵向切换的全屏播放器。游客登录、推荐、收藏、离线播放、编辑导出、额度、开屏与激励广告、订阅和恢复购买继续走原有路径。订阅与媒体导出保留服务端权益校验。
 - API 为 `https://o4r8xgd.kstep.site`，应用名与 `getV2.name` 共用 `SWEVO_RELEASE_NAME` 的 `Kstep`。打包、游客登录 `source` 和业务 `packageName` 使用正式 BID `site.kstepchan.motion`。
 - 广告 App ID 由 `Config/Swevo.xcconfig` 提供。开屏和激励广告位从 `getV2.adList` 读取，演示模式已关闭。官网、隐私政策和条款使用 `www.kstep.site`。商品采用月付 `site.kstepchan.motion.plus.monthly`、年付 `site.kstepchan.motion.plus.yearly`，待在 App Store Connect 创建并完成后台映射。会员页展示 StoreKit 返回的本地化价格和账期。
-- 播放联调使用当前 API 可访问的链接或短码。原测试配置和接口约定见工具包的 [Clipo 基线](/Users/chengdupengyuyan/.codex/skills/toolkit/references/clipo-baseline.md)。Clipo 源工程位于 `/Users/chengdupengyuyan/Fun/Clipo`。
+- 播放联调使用当前 API 可访问的链接或短码。接口、广告和订阅沿用项目的 Toolkit 接入约定。
 - Release 已采用 `Apple Distribution`，签名团队和描述文件待填写。2026-11-18 使用已有 userId 只读查询 `getV2` 返回 `code=0`，未下发 `adList` 和 `ios`，需用当前正式游客核对后台登记、广告位和验单路由。
 
 ## 本项目的原创界面
@@ -22,4 +22,3 @@ Kstep 是以视频文件为核心的工具，提供播放、编辑和导出，�
 
 - 源码核对覆盖文件导入、回看、导出、导航、会员文案及课程返回路径。播放和广告的日志入口见 `README.md`。
 - 待运行验证的事项包括编译、模拟器和真机显示、Duo 布局、测试后台返回、短码播放、广告以及 Apple Sandbox 购买与恢复。按用户约定，默认只做静态核对，编译和测试在用户明确要求时执行。
-- 4.3 和内购的送审缺口见 [Swevo 源码审计](docs/AppReview/2026-11-16/review-report.md)。

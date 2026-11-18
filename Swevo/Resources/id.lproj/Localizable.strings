@@ -868,3 +868,7 @@
 "Usage details" = "Rincian penggunaan";
 "Hide details" = "Sembunyikan rincian";
 "%@ left · %@ total today" = "Sisa %@ · Total hari ini %@";
+"Check price" = "Periksa harga";
+"Billed monthly" = "Ditagih bulanan";
+"Billed yearly" = "Ditagih tahunan";
+"%@ every %@" = "%@ setiap %@";

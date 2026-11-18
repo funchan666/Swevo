@@ -868,3 +868,7 @@
 "Usage details" = "Usage details";
 "Hide details" = "Hide details";
 "%@ left · %@ total today" = "%@ left · %@ total today";
+"Check price" = "Check price";
+"Billed monthly" = "Billed monthly";
+"Billed yearly" = "Billed yearly";
+"%@ every %@" = "%@ every %@";
