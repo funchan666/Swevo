@@ -1,65 +1,119 @@
 workflows:
-  unison-ios-app-store:
-    name: Unison iOS App Store
+  kstep-ios-app-store:
+    name: Kstep iOS App Store
     max_build_duration: 120
     instance_type: mac_mini_m2
 
     integrations:
-      app_store_connect: Unison
+      app_store_connect: Kstep
 
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.unisonvocal.community
+        bundle_identifier: site.kstepchan.motion
 
       vars:
-        BUNDLE_ID: "com.unisonvocal.community"
-        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
-        APP_STORE_APPLE_ID: "6802950506"
+        BUNDLE_ID: "site.kstepchan.motion"
+        XCODE_PROJECT: "Swevo.xcodeproj"
+        XCODE_SCHEME: "kstep"
+        APP_STORE_APPLE_ID: "6836221567"
 
-      xcode: latest
+      xcode: "27.1"
 
     scripts:
       - name: Verify native iOS project configuration
         script: |
-          set -e
-          test -d "$CM_BUILD_DIR/$XCODE_WORKSPACE"
-          test -f "$CM_BUILD_DIR/ios/Runner.xcodeproj/xcshareddata/xcschemes/$XCODE_SCHEME.xcscheme"
-          grep -q "PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;" \
-            "$CM_BUILD_DIR/ios/Runner.xcodeproj/project.pbxproj"
+          #!/bin/bash
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          test -d "$XCODE_PROJECT"
+          test -f "$XCODE_PROJECT/xcshareddata/xcschemes/$XCODE_SCHEME.xcscheme"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          config = Path("Config/Swevo.xcconfig").read_text()
+          bundle = re.search(r"^PRODUCT_BUNDLE_IDENTIFIER\s*=\s*(\S+)", config, re.M)
+          if bundle is None or bundle.group(1) != os.environ["BUNDLE_ID"]:
+              raise SystemExit("The workflow Bundle ID does not match Config/Swevo.xcconfig.")
+          PY
+          xcodebuild -version
 
       - name: Set up App Store signing
         script: |
-          set -e
-          cd "$CM_BUILD_DIR/ios"
+          #!/bin/bash
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
           xcode-project use-profiles
 
       - name: Set next App Store build number
         script: |
-          set -e
-          cd "$CM_BUILD_DIR/ios"
+          #!/bin/bash
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          KSTEP_LATEST_APP_STORE_BUILD_NUMBER="$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" --platform IOS)"
+          KSTEP_LATEST_TESTFLIGHT_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" --platform IOS)"
+          export KSTEP_LATEST_APP_STORE_BUILD_NUMBER KSTEP_LATEST_TESTFLIGHT_BUILD_NUMBER
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
 
-          LATEST_BUILD_NUMBER="$(
-            app-store-connect get-latest-testflight-build-number \
-              "$APP_STORE_APPLE_ID" 2>/dev/null || true
-          )"
-
-          if echo "$LATEST_BUILD_NUMBER" | grep -Eq '^[0-9]+$'; then
-            NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
-          else
-            NEXT_BUILD_NUMBER="${BUILD_NUMBER:-1}"
-          fi
-
-          echo "Using build number: $NEXT_BUILD_NUMBER"
-          agvtool new-version -all "$NEXT_BUILD_NUMBER"
+          path = Path("Config/Swevo.xcconfig")
+          config = path.read_text()
+          pattern = r"^CURRENT_PROJECT_VERSION\s*=\s*([0-9]+)[ \t]*$"
+          current = re.search(pattern, config, re.M)
+          if current is None:
+              raise SystemExit("Expected an integer CURRENT_PROJECT_VERSION in Config/Swevo.xcconfig.")
+          numbers = [int(current.group(1))]
+          for key in ("KSTEP_LATEST_APP_STORE_BUILD_NUMBER", "KSTEP_LATEST_TESTFLIGHT_BUILD_NUMBER", "BUILD_NUMBER", "PROJECT_BUILD_NUMBER"):
+              value = os.environ.get(key, "").strip()
+              if value in ("", "null", "None"):
+                  value = "0"
+              if re.fullmatch(r"[0-9]+", value) is None:
+                  raise SystemExit(f"{key} did not contain an integer build number.")
+              numbers.append(int(value))
+          next_number = max(numbers) + 1
+          config, count = re.subn(pattern, f"CURRENT_PROJECT_VERSION = {next_number}", config, flags=re.M)
+          if count != 1:
+              raise SystemExit("Expected exactly one CURRENT_PROJECT_VERSION assignment.")
+          path.write_text(config)
+          with Path(os.environ["CM_ENV"]).open("a") as environment:
+              environment.write(f"KSTEP_BUILD_NUMBER={next_number}\n")
+          print(f"Using build number: {next_number}")
+          PY
 
       - name: Build signed IPA
         script: |
-          set -e
+          #!/bin/bash
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
           xcode-project build-ipa \
-            --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
+
+      - name: Verify IPA identity before upload
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          python3 - <<'PY'
+          import os, plistlib, re, zipfile
+          from pathlib import Path
+
+          artifacts = list(Path("build/ios/ipa").glob("*.ipa"))
+          if len(artifacts) != 1:
+              raise SystemExit("Expected exactly one signed IPA in build/ios/ipa.")
+          with zipfile.ZipFile(artifacts[0]) as archive:
+              plists = [name for name in archive.namelist() if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", name)]
+              if len(plists) != 1:
+                  raise SystemExit("Expected exactly one main app Info.plist in the IPA.")
+              info = plistlib.loads(archive.read(plists[0]))
+          if info.get("CFBundleIdentifier") != os.environ["BUNDLE_ID"]:
+              raise SystemExit("The IPA Bundle ID does not match the production Bundle ID.")
+          if str(info.get("CFBundleVersion")) != os.environ["KSTEP_BUILD_NUMBER"]:
+              raise SystemExit("The IPA build number does not match the allocated build number.")
+          print(f"Verified {info['CFBundleIdentifier']} {info.get('CFBundleShortVersionString')} ({info['CFBundleVersion']})")
+          PY
 
     artifacts:
       - build/ios/ipa/*.ipa
