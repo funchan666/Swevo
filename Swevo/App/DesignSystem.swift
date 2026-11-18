@@ -533,13 +533,12 @@ struct MediaCover: View {
         SwevoStyle.raised.overlay {
             GeometryReader { geometry in
                 Group {
-                    if folder { Glyph(symbol: .folder, size: 30) }
-                    else if let url {
+                    if let url {
                         AsyncImage(url: url) { phase in
                             if let image = phase.image { image.resizable().scaledToFill() }
-                            else { Glyph(symbol: .feed, size: 30) }
+                            else { Glyph(symbol: folder ? .folder : .feed, size: 30) }
                         }
-                    } else { Glyph(symbol: .feed, size: 30) }
+                    } else { Glyph(symbol: folder ? .folder : .feed, size: 30) }
                 }.frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
             }
