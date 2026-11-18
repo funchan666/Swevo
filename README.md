@@ -9,9 +9,9 @@ Open `Swevo.xcodeproj` and select the shared `kstep` scheme for the `Kstep` app 
 ## Service configuration
 
 - The API host is `o4r8xgd.kstep.site`. The app name and `getV2.name` use `Kstep` from `SWEVO_RELEASE_NAME`.
-- Builds use the shared test Bundle ID `im.seex.lobo`. The guest login `source` and business `packageName` use `site.kstepchan.motion`.
+- The Bundle ID, guest login `source`, and business `packageName` use `site.kstepchan.motion`.
 - AdMob uses the packaged App ID in `Config/Swevo.xcconfig`. App-open and rewarded units come from `getV2.adList` as Google types `1` and `5` respectively. Each placement's `config.appId` must match the packaged App ID.
-- Membership uses the test product IDs `coins_1.99` and `conis_4.99`. StoreKit supplies the prices and billing periods displayed in the app. Filter the Xcode console by `StoreKitPlans` for a missing or invalid product response.
+- Membership uses `site.kstepchan.motion.plus.monthly` and `site.kstepchan.motion.plus.yearly`. Create these exact IDs under Kstep's subscription group in App Store Connect, with one-month and one-year durations, and map them as `rightsName` in the backend. The existing backend `usdPrice` values are `999` and `9999`. StoreKit supplies the displayed prices and billing periods.
 - The app links to the [Kstep website](https://www.kstep.site), [privacy policy](https://www.kstep.site/privacy.html), and [terms](https://www.kstep.site/terms.html).
 
 For playback verification, enter a supported video link or short code from the configured API. Check the full-screen player and the entry under Recently opened. Use an authorized test account when verifying Apple purchases and restores.
@@ -24,7 +24,11 @@ For playback verification, enter a supported video link or short code from the c
 
 ## Production transition
 
-Debug and Release both inherit `Config/Swevo.xcconfig`. When switching to production signing, set `PRODUCT_BUNDLE_IDENTIFIER` to `site.kstepchan.motion` and verify the StoreKit products and backend purchase mapping for that app.
+Debug and Release both inherit `Config/Swevo.xcconfig` and use the production Bundle ID. Release uses `Apple Distribution` with manual signing. The signing team and provisioning profile still need values matching the registered production App ID. Archive uses the shared `kstep` scheme's Release configuration.
+
+The receipt routing fields come from `getV2.ios` and are saved with each order. The backend must support production purchases and Sandbox purchases from TestFlight and App Review. Existing pending orders keep their original product, owner, API host, and receipt configuration.
+
+On 2026-11-18, the website, privacy policy and terms returned HTTP 200. A read-only `getV2` request using an existing user ID returned business code `0` and omitted `adList` and `ios`. Confirm the release registration and ad placements for Kstep with a current production visitor. Product creation, backend order mapping, receipt routing and purchase/restore still need account and service verification.
 
 In AdMob **Privacy & messaging**, publish the messages for the regions you serve and assign them to the iOS app matching the packaged AdMob App ID. Use Kstep's privacy policy URL in the AdMob message and verify consent and placements with Google test devices. [Google iOS UMP setup](https://developers.google.com/admob/ios/privacy)
 

@@ -7,7 +7,7 @@ import OSLog
 struct SwevoConfiguration {
     let apiBaseURL: URL?
     let bundleID: String // Installed identity: signing and background transfers.
-    let servicePackageName: String // Backend registration, independent of this test build.
+    let servicePackageName: String // Backend package registration and guest-login source.
     let version: String
     let privacyURL: URL?
     let termsURL: URL?

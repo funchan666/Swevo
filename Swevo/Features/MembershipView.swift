@@ -66,7 +66,7 @@ struct MembershipView: View {
     var body: some View {
         GeometryReader { container in
             let dockWidth = min(680, container.size.width)
-            let dockHeight = min(typeSize.isAccessibilitySize ? 176 : 132, container.size.height)
+            let dockHeight = min(typeSize.isAccessibilitySize ? 208 : 164, container.size.height)
             let dock = CGRect(x: (container.size.width - dockWidth) / 2, y: container.size.height - dockHeight,
                               width: dockWidth, height: dockHeight)
             let pinsPurchaseBar = container.size.height >= (typeSize.isAccessibilitySize ? 520 : 340)
@@ -199,7 +199,7 @@ struct MembershipView: View {
 
     @ViewBuilder private func purchaseBar(showsBilling: Bool) -> some View {
         if commerce.canRetryPurchaseConfirmation || (!commerce.premium && !configuredPlans.isEmpty) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 if commerce.canRetryPurchaseConfirmation {
                     ActionButton(title: "Retry purchase confirmation", primary: false, busy: purchasing) {
                         purchaseAction = .subscribe
@@ -219,7 +219,7 @@ struct MembershipView: View {
             .pageHorizontalMargins()
             .frame(maxWidth: 680)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
+            .padding(.vertical, 12)
             .background(SwevoStyle.background)
             .overlay(alignment: .top) {
                 Divider().overlay(SwevoStyle.line)
@@ -455,10 +455,36 @@ struct MembershipView: View {
 
     private var checkoutButton: some View {
         let canShowOffer = selectedPlan != nil && !loadingCatalog
+        let tint = canShowOffer ? SwevoStyle.ink : SwevoStyle.paper
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
         return Button {
             if canShowOffer { subscribe() } else { reloadPlans() }
         } label: {
-            ActionLabel(title: purchaseButtonTitle, primary: canShowOffer, busy: purchasing || loadingCatalog)
+            HStack(spacing: 16) {
+                LocalizedText(purchaseButtonTitle)
+                    .font(.capture(.title3, weight: .bold))
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Group {
+                    if purchasing || loadingCatalog {
+                        ProgressView().tint(tint)
+                    } else {
+                        Glyph(symbol: .back, size: 18, tint: tint).rotationEffect(.degrees(180))
+                    }
+                }
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 22).padding(.vertical, 16)
+            .frame(maxWidth: .infinity, minHeight: 72)
+            .foregroundStyle(tint)
+            .background(canShowOffer ? SwevoStyle.accent : SwevoStyle.raised, in: shape)
+            .overlay {
+                shape.strokeBorder(canShowOffer ? SwevoStyle.paper.opacity(0.48) : SwevoStyle.line)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(.interaction, shape)
         }.buttonStyle(PressStyle())
             .disabled(interactionLocked || (canShowOffer && api.session == nil))
             .accessibilityIdentifier(canShowOffer ? "membership.subscribe" : "membership.retryPlans")

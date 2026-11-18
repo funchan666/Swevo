@@ -1,10 +1,10 @@
-// Use the shared test Bundle ID for the installed app.
-PRODUCT_BUNDLE_IDENTIFIER = im.seex.lobo
+// Production identity shared by the installed app and backend requests.
+PRODUCT_BUNDLE_IDENTIFIER = site.kstepchan.motion
 // Canonical app name used by the bundle and getV2.
 SWEVO_RELEASE_NAME = Kstep
 SWEVO_API_HOST = o4r8xgd.kstep.site
 // Backend identity for business packageName and guest-login source.
-SWEVO_SERVICE_PACKAGE_NAME = site.kstepchan.motion
+SWEVO_SERVICE_PACKAGE_NAME = $(PRODUCT_BUNDLE_IDENTIFIER)
 // Empty expansion preserves // in xcconfig URL values.
 SWEVO_WEBSITE_URL = https:/$()/www.kstep.site
 SWEVO_PRIVACY_URL = https:/$()/www.kstep.site/privacy.html
